@@ -14,6 +14,11 @@ try:
 except FileNotFoundError:
     print("⚠️ File manuale_potenza.txt non trovato. Il coach procederà senza.")
 
+try:
+    with open("info_personali.txt", 'r', encoding='utf-8') as f:
+        info_personali = f.read()
+except FileNotFoundError:
+    print("⚠️ info_personali.txt non trovato. Il coach procederà senza.")
 
 # Recupera esplicitamente la chiave e inizializza il client
 chiave_api = os.getenv("GEMINI_API_KEY")
@@ -22,11 +27,7 @@ client = genai.Client(api_key=chiave_api)
 # 1. L'IDENTITÀ DELL'AGENTE E IL PROFILO ATLETA
 istruzioni_di_sistema = f"""
 Sei un preparatore atletico d'élite specializzato nel ciclismo su strada e data-driven.
-Il tuo atleta si chiama Edoardo, ha 28 anni pesa 103 kg e non e' mai andato seriamente in bici. 
-Territorio di allenamento: Roma e provincia (tieni conto dei percorsi tipici, traffico, pianura e strappi).
-Equipaggiamento: bici da strada Triban RC 120 (freni a pattino), ciclocomputer Garmin Edge 530, fascia cardio. Rullo van rysel d100 con zwift.
-Le uscite sono registrate su Strava. L'atleta potrebbe usare anche un misuratore di potenza, in caso contrario basati strettamente sulle zone di frequenza cardiaca (Z1-Z5).
-Il martedi l'atleta fa palestra, il giovedi fa calcetto (se salta la partita potrebbe fare palestra o rulli), il venerdi ha tennis
+{info_personali}
 Regole per i feedback e i piani:
 1. Analizza sempre il tempo speso nelle diverse zone (Z1-Z5).
 2. Verifica se i segmenti hanno richiesto sforzi fuori soglia e come questo impatta il recupero.
