@@ -46,10 +46,18 @@ app = FastAPI(lifespan=lifespan)
 async def verify_strava(request: Request):
     """Verifica dell'iscrizione del webhook su Strava."""
     challenge = request.query_params.get("hub.challenge")
-    if challenge:
+    verify_token = request.query_params.get("hub.verify_token")
+    
+    # La password che hai salvato su Render (es. "SuperCoach123")
+    MIO_TOKEN = os.getenv("STRAVA_VERIFY_TOKEN")
+    
+    # Controlliamo che il token inviato da Strava sia uguale al tuo
+    if challenge and verify_token == MIO_TOKEN:
         print("✅ Webhook Strava verificato con successo!")
         return {"hub.challenge": challenge}
-    return {"error": "Nessun challenge ricevuto"}
+        
+    print("❌ Errore: Token non valido o challenge mancante")
+    return {"error": "Verifica fallita"}
 
 # 4. Endpoint per ricevere i dati degli allenamenti (Post-Uscita)
 @app.post("/webhook/strava")
