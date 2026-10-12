@@ -1,0 +1,13 @@
+# Ambienti virtuali
+.venv/
+env/
+__pycache__/
+
+# File con chiavi segrete
+.env
+
+# Il tuo database locale
+users_db.json
+
+# Il tuo manuale privato
+Manuale_potenza.txt
