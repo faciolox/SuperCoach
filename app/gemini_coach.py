@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 # Carica le variabili d'ambiente (inclusa GEMINI_API_KEY)
 load_dotenv()
 
-
+testo_manuale = ''
 # Caricamento manuale allenamento
 try:
     with open("Manuale_potenza.txt", 'r', encoding='utf-8') as f:
