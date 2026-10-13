@@ -2,7 +2,7 @@ import os
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
-
+from datetime import datetime
 # Carica le variabili d'ambiente (inclusa GEMINI_API_KEY)
 load_dotenv()
 
@@ -65,13 +65,30 @@ def genera_piano_allenamento(dati_utente: dict):
     Genera un programma strutturato giorno per giorno. Evidenzia chiaramente i giorni di riposo, 
     le sessioni di qualità e i lunghi. Specifica i minuti da passare in ciascuna zona.
     """
-    response = client.models.generate_content(
-        model='gemini-flash-latest',
-        contents=prompt,
-        config=config_base
-    )
-    return response.text
-
+    
+    try:
+        now = datetime.now()
+        print(f"🕒 {now.strftime("%d/%m/%Y, %H:%M:%S")}: Richiesta API inviata a Gemini. Prompt:\n{prompt}")
+        
+        # LA CHIAMATA A GEMINI DEVE STARE QUI DENTRO
+        risposta_gemini = client.models.generate_content(
+            model='gemini-2.5-flash', # o il modello che usi
+            contents=prompt,
+            config=config_base
+        )
+        now2 = datetime.now()
+        print(f"✅ {now2.strftime('%d/%m/%Y, %H:%M:%S')}: Risposta elaborata con successo in {now2-now:.2f} secondi.")
+        
+        # Estraiamo il testo pulito per Telegram
+        response = risposta_gemini.text
+        
+    except Exception as e:
+        # Registriamo l'errore tecnico nel log di Render per fare debug
+        print(f"❌ {datetime.now().strftime('%d/%m/%Y, %H:%M:%S')} - ERRORE API GEMINI: {e}")
+        
+        # Salviamo un messaggio discorsivo che Telegram può effettivamente inviare senza crashare
+        response = "Mi dispiace, si è verificato un errore durante l'elaborazione dei tuoi dati. Riprova tra poco."
+    return response
 # 3. CRITICO DELLE PRESTAZIONI POST-ALLENAMENTO
 def analizza_uscita(dati_strava_puliti: dict):
     """
@@ -99,9 +116,20 @@ def analizza_uscita(dati_strava_puliti: dict):
     Fornisci un commento tecnico sull'esecuzione di questa uscita, valutando il carico interno 
     (cuore) ed esterno (potenza/dislivello). Dimmi come questa uscita impatterà il recupero dei prossimi giorni.
     """
-    response = client.models.generate_content(
-        model='gemini-flash-latest',
-        contents=prompt,
-        config=config_base
-    )
-    return response.text
+    try: 
+        now = datetime.now()
+        print(f"🕒 {now.strftime("%d/%m/%Y, %H:%M:%S")}: Richiesta API inviata a Gemini. Prompt:\n{prompt}")
+        response = client.models.generate_content(
+            model='gemini-flash-latest',
+            contents=prompt,
+            config=config_base
+        )
+        now2 = datetime.now()
+        print(f"✅ {now2.strftime('%d/%m/%Y, %H:%M:%S')}: Risposta elaborata con successo in {now2-now:.2f}.")
+        return response.text
+    except Exception as e:
+            # Registriamo l'errore tecnico nel log di Render per fare debug
+            print(f"❌ {datetime.now().strftime('%d/%m/%Y, %H:%M:%S')} - ERRORE API GEMINI: {e}")
+            
+            # Salviamo un messaggio discorsivo che Telegram può effettivamente inviare senza crashare
+            response = "Mi dispiace, si è verificato un errore durante l'elaborazione dei tuoi dati. Riprova tra poco."
