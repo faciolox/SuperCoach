@@ -72,7 +72,7 @@ def genera_piano_allenamento(dati_utente: dict):
         
         # LA CHIAMATA A GEMINI DEVE STARE QUI DENTRO
         risposta_gemini = client.models.generate_content(
-            model='gemini-2.5-flash', # o il modello che usi
+            model='gemini-flash-latest', # o il modello che usi
             contents=prompt,
             config=config_base
         )

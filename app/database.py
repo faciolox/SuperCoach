@@ -1,71 +1,50 @@
-import json
 import os
+from pymongo import MongoClient
 
-# Il file locale che farà da database temporaneo
-DB_FILE = "users_db.json"
+# Connessione al database
+mongo_uri = os.getenv("MONGO_URI")
+if not mongo_uri:
+    print("⚠️ Attenzione: Variabile MONGO_URI mancante!")
+
+client = MongoClient(mongo_uri)
+db_client = client["supercoach_db"]
+users_collection = db_client["users"]
+
+# --- FUNZIONI DI GESTIONE UTENTI ---
+
+def get_user(chat_id):
+    """Recupera un utente dal DB tramite il suo chat_id"""
+    user = users_collection.find_one({"chat_id": str(chat_id)})
+    return user if user else {}
+
+def save_user(chat_id, data):
+    """Aggiorna un utente esistente o lo crea se non esiste (upsert)"""
+    data["chat_id"] = str(chat_id)
+    users_collection.update_one(
+        {"chat_id": str(chat_id)},
+        {"$set": data},
+        upsert=True
+    )
 
 def _load_db():
-    """Funzione interna per caricare il file JSON."""
-    if not os.path.exists(DB_FILE):
-        return {}
-    
-    try:
-        with open(DB_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except json.JSONDecodeError:
-        return {}
+    """Restituisce tutti gli utenti (usato per l'invio automatico a tutti)"""
+    utenti = {}
+    for user in users_collection.find():
+        utenti[int(user["chat_id"])] = user
+    return utenti
 
-def _save_db(data):
-    """Funzione interna per salvare il dizionario nel file JSON."""
-    with open(DB_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
+def update_user_state(chat_id, stato, step=None):
+    """Aggiorna lo stato e lo step dell'utente durante l'onboarding"""
+    user = get_user(chat_id)
+    user["stato"] = stato
+    if step is not None:
+        user["step"] = step
+    save_user(chat_id, user)
 
-def get_user(chat_id: int):
-    """
-    Recupera i dati di un utente tramite il suo ID Telegram.
-    Se l'utente non esiste, lo crea con uno stato iniziale di ONBOARDING.
-    """
-    db = _load_db()
-    str_chat_id = str(chat_id) # Le chiavi JSON sono sempre stringhe
-    
-    if str_chat_id not in db:
-        # Struttura dati di base per un nuovo atleta
-        db[str_chat_id] = {
-            "stato": "ONBOARDING",
-            "step_onboarding": 0, # Serve per tenere traccia delle domande iniziali
-            "profilo": {
-                "obiettivo": None,
-                "timeline": None,
-                "giorni_disponibili": None,
-                "zone_hr": None,
-                "ftp": None
-            }
-        }
-        _save_db(db)
-        
-    return db[str_chat_id]
-
-def update_user_profile(chat_id: int, key: str, value: str):
-    """
-    Aggiorna un singolo parametro del profilo (es. 'obiettivo', 'ftp').
-    """
-    db = _load_db()
-    str_chat_id = str(chat_id)
-    
-    if str_chat_id in db:
-        db[str_chat_id]["profilo"][key] = value
-        _save_db(db)
-
-def update_user_state(chat_id: int, nuovo_stato: str, step: int = None):
-    """
-    Aggiorna lo stato generale dell'utente (ONBOARDING, ACTIVE, PAUSED)
-    e opzionalmente il punto esatto del questionario in cui si trova.
-    """
-    db = _load_db()
-    str_chat_id = str(chat_id)
-    
-    if str_chat_id in db:
-        db[str_chat_id]["stato"] = nuovo_stato
-        if step is not None:
-            db[str_chat_id]["step_onboarding"] = step
-        _save_db(db)
+def update_user_profile(chat_id, key, value):
+    """Salva una singola informazione nel profilo dell'utente"""
+    user = get_user(chat_id)
+    if "profilo" not in user:
+        user["profilo"] = {}
+    user["profilo"][key] = value
+    save_user(chat_id, user)

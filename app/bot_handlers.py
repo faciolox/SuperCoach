@@ -84,7 +84,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     utente = db.get_user(chat_id)
     stato = utente.get("stato")
-    step = utente.get("step_onboarding")
+    step = utente.get("step")
     
     if stato == "ONBOARDING":
         if step == 0:
