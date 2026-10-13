@@ -119,8 +119,30 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # Salva il piano nel database
             db.update_user_profile(chat_id, "piano_corrente", piano_generato)
-            
-            await update.message.reply_text(f"Ecco il tuo piano strutturato:\n\n{piano_generato}")
+            messaggio_completo = f"Ecco il tuo piano strutturato:\n\n{piano_generato}"
+            MAX_LEN = 4000
+
+            while len(messaggio_completo) > 0:
+                if len(messaggio_completo) <= MAX_LEN:
+                    await update.message.reply_text(messaggio_completo)
+                    break
+                    
+                # Cerca l'ultimo "a capo" entro il limite di 4000 caratteri
+                punto_taglio = messaggio_completo.rfind('\n', 0, MAX_LEN)
+                
+                # Se non trova un "a capo", cerca l'ultimo spazio bianco
+                if punto_taglio == -1:
+                    punto_taglio = messaggio_completo.rfind(' ', 0, MAX_LEN)
+                    
+                # Se non trova nemmeno uno spazio (improbabile), forza il taglio al limite
+                if punto_taglio == -1:
+                    punto_taglio = MAX_LEN
+                    
+                # Invia il blocco pulito
+                await update.message.reply_text(messaggio_completo[:punto_taglio])
+                
+                # Rimuove la parte inviata dalla stringa totale e toglie eventuali spazi vuoti all'inizio
+                messaggio_completo = messaggio_completo[punto_taglio:].lstrip()
             await update.message.reply_text(
                 "Da questo momento, ogni volta che salverai un'attività su Strava, "
                 "la analizzerò automaticamente e ti manderò il resoconto qui.\n\n"
