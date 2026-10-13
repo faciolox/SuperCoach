@@ -65,7 +65,6 @@ def genera_piano_allenamento(dati_utente: dict):
     Genera un programma strutturato giorno per giorno. Evidenzia chiaramente i giorni di riposo, 
     le sessioni di qualità e i lunghi. Specifica i minuti da passare in ciascuna zona.
     """
-    return prompt
     response = client.models.generate_content(
         model='gemini-flash-latest',
         contents=prompt,
