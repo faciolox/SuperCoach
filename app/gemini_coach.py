@@ -69,7 +69,6 @@ def genera_piano_allenamento(dati_utente: dict):
     try:
         now = datetime.now()
         print(f"🕒 {now.strftime("%d/%m/%Y, %H:%M:%S")}: Richiesta API inviata a Gemini. Prompt:\n{prompt}")
-        
         # LA CHIAMATA A GEMINI DEVE STARE QUI DENTRO
         risposta_gemini = client.models.generate_content(
             model='gemini-flash-latest', # o il modello che usi
@@ -77,7 +76,8 @@ def genera_piano_allenamento(dati_utente: dict):
             config=config_base
         )
         now2 = datetime.now()
-        print(f"✅ {now2.strftime('%d/%m/%Y, %H:%M:%S')}: Risposta elaborata con successo in {now2-now:.2f} secondi.")
+        time_delta = (now2-now).total_seconds()
+        print(f"✅ {now2.strftime('%d/%m/%Y, %H:%M:%S')}: Risposta elaborata con successo in {time_delta:.2f} secondi.")
         
         # Estraiamo il testo pulito per Telegram
         response = risposta_gemini.text
@@ -125,7 +125,8 @@ def analizza_uscita(dati_strava_puliti: dict):
             config=config_base
         )
         now2 = datetime.now()
-        print(f"✅ {now2.strftime('%d/%m/%Y, %H:%M:%S')}: Risposta elaborata con successo in {now2-now:.2f}.")
+        time_delta = (now2-now).total_seconds()
+        print(f"✅ {now2.strftime('%d/%m/%Y, %H:%M:%S')}: Risposta elaborata con successo in {time_delta:.2f}.")
         return response.text
     except Exception as e:
             # Registriamo l'errore tecnico nel log di Render per fare debug

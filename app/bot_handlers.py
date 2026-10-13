@@ -36,8 +36,31 @@ async def mostra_piano(update: Update, context: ContextTypes.DEFAULT_TYPE):
     utente = db.get_user(chat_id)
     
     if utente.get("stato") == "ACTIVE" and "piano_corrente" in utente.get("profilo", {}):
-        piano = utente["profilo"]["piano_corrente"]
-        await update.message.reply_text(f"📖 **Ecco il tuo piano di allenamento attuale:**\n\n{piano}")
+        messaggio_completo = utente["profilo"]["piano_corrente"]
+        
+        MAX_LEN = 4000
+        
+        while len(messaggio_completo) > 0:
+            if len(messaggio_completo) <= MAX_LEN:
+                await update.message.reply_text(messaggio_completo)
+                break
+                
+            # Cerca l'ultimo "a capo" entro il limite di 4000 caratteri
+            punto_taglio = messaggio_completo.rfind('\n', 0, MAX_LEN)
+            
+            # Se non trova un "a capo", cerca l'ultimo spazio bianco
+            if punto_taglio == -1:
+                punto_taglio = messaggio_completo.rfind(' ', 0, MAX_LEN)
+                
+            # Se non trova nemmeno uno spazio (improbabile), forza il taglio al limite
+            if punto_taglio == -1:
+                punto_taglio = MAX_LEN
+                
+            # Invia il blocco pulito
+            await update.message.reply_text(messaggio_completo[:punto_taglio])
+            
+            # Rimuove la parte inviata dalla stringa totale e toglie eventuali spazi vuoti all'inizio
+            messaggio_completo = messaggio_completo[punto_taglio:].lstrip()
     else:
         await update.message.reply_text("Non hai nessun piano attivo al momento. Usa /start per crearne uno nuovo.")
 
