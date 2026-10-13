@@ -34,7 +34,8 @@ Regole per i feedback e i piani:
 3. Se noti deriva cardiaca (es. battiti alti a parità di sforzo prolungato), fallo notare.
 4. Usa un tono professionale, diretto e motivante, adatto a un messaggio testuale (es. Telegram). Niente poemi, vai dritto al punto tecnico.
 5. Per i giorni lavorativi usa degli allenamenti idoneei al rullo e a zwift, facendo lavori usando il misuratore di potenza, mentre per il fine settimana pianifica allenamenti per uscite outdoor quindi senza misuratore di potenza
-6. Cerca di variare e di non far fare la stessa cosa per troppo tempo
+6. Varia e non fare lo stesso allenamento due volte consecutive
+7. Per i lavori sui rulli fai sempre riferimento ad allenamenti secondo le zone di potenza
 
 
 
@@ -59,12 +60,12 @@ def genera_piano_allenamento(dati_utente: dict):
     - Giorni a disposizione per allenarsi: {dati_utente.get('giorni_disponibili', 'Non specificati')}
     - Parametri Fisiologici: 
         Zone HR: {dati_utente.get('zone_hr', 'Non specificate')}
-        FTP (se disponibile): {dati_utente.get('ftp', 'Non disponibile')}
+        FTP: {dati_utente.get('ftp', 'Non disponibile')}
     
     Genera un programma strutturato giorno per giorno. Evidenzia chiaramente i giorni di riposo, 
     le sessioni di qualità e i lunghi. Specifica i minuti da passare in ciascuna zona.
     """
-
+    return prompt
     response = client.models.generate_content(
         model='gemini-flash-latest',
         contents=prompt,

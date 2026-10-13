@@ -100,10 +100,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif step == 2:
             db.update_user_profile(chat_id, "giorni_disponibili", testo)
             db.update_user_state(chat_id, "ONBOARDING", step=3)
-            await update.message.reply_text("4️⃣ Quali sono le tue zone di frequenza cardiaca (o FC Max) e la tua FTP (se la conosci)?")
+            await update.message.reply_text("4️⃣ Quali sono le tue zone di frequenza cardiaca (o FC Max)")
             
         elif step == 3:
             db.update_user_profile(chat_id, "zone_hr", testo)
+            db.update_user_state(chat_id, "ONBOARDING", step=4)
+            await update.message.reply_text("4️⃣ Quali e' la tua FTP? Se non la conosci scrivi sconosciuta")
+        elif step == 4:
+            db.update_user_profile(chat_id,"ftp", testo)
             db.update_user_state(chat_id, "ACTIVE", step=None)
             
             await update.message.reply_text("Perfetto! Sto elaborando il tuo profilo e generando il piano di allenamento con Gemini. Un attimo di pazienza... 🚴‍♂️")
