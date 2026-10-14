@@ -5,7 +5,7 @@ from app.gemini_coach import genera_piano_allenamento
 import app.strava_client as strava
 from app.gemini_coach import analizza_uscita
 from app.gemini_coach import analizza_uscite_settimanali
-
+from datetime import datetime, date
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Inizializza l'utente e avvia il processo di onboarding."""
@@ -25,7 +25,6 @@ async def interrompi_piano(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mette in pausa il piano attuale."""
     chat_id = update.effective_chat.id
     db.update_user_state(chat_id, "PAUSED", step=None)
-    
     await update.message.reply_text(
         "Piano di allenamento interrotto. Il webhook di Strava è disabilitato per te.\n"
         "Quando vuoi ricominciare, usa il comando /start."
@@ -33,55 +32,60 @@ async def interrompi_piano(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def mostra_piano(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mostra il piano attualmente salvato in memoria."""
-    chat_id = update.effective_chat.id
-    utente = db.get_user(chat_id)
-    
-    if utente.get("stato") == "ACTIVE" and "piano_corrente" in utente.get("profilo", {}):
-        messaggio_completo = utente["profilo"]["piano_corrente"]
-        
-        MAX_LEN = 4000
-        
-        while len(messaggio_completo) > 0:
-            if len(messaggio_completo) <= MAX_LEN:
-                await update.message.reply_text(messaggio_completo)
-                break
-                
-            # Cerca l'ultimo "a capo" entro il limite di 4000 caratteri
-            punto_taglio = messaggio_completo.rfind('\n', 0, MAX_LEN)
+    try:
+        chat_id = update.effective_chat.id
+        utente = db.get_user(chat_id)
+        print(f"{datetime.isoformat()}: Richiesta piano")
+        if utente.get("stato") == "ACTIVE" and "piano_corrente" in utente.get("profilo", {}):
+            messaggio_completo = utente["profilo"]["piano_corrente"]
             
-            # Se non trova un "a capo", cerca l'ultimo spazio bianco
-            if punto_taglio == -1:
-                punto_taglio = messaggio_completo.rfind(' ', 0, MAX_LEN)
-                
-            # Se non trova nemmeno uno spazio (improbabile), forza il taglio al limite
-            if punto_taglio == -1:
-                punto_taglio = MAX_LEN
-                
-            # Invia il blocco pulito
-            await update.message.reply_text(messaggio_completo[:punto_taglio])
+            MAX_LEN = 4000
             
-            # Rimuove la parte inviata dalla stringa totale e toglie eventuali spazi vuoti all'inizio
-            messaggio_completo = messaggio_completo[punto_taglio:].lstrip()
-    else:
-        await update.message.reply_text("Non hai nessun piano attivo al momento. Usa /start per crearne uno nuovo.")
-
+            while len(messaggio_completo) > 0:
+                if len(messaggio_completo) <= MAX_LEN:
+                    await update.message.reply_text(messaggio_completo)
+                    break
+                    
+                # Cerca l'ultimo "a capo" entro il limite di 4000 caratteri
+                punto_taglio = messaggio_completo.rfind('\n', 0, MAX_LEN)
+                
+                # Se non trova un "a capo", cerca l'ultimo spazio bianco
+                if punto_taglio == -1:
+                    punto_taglio = messaggio_completo.rfind(' ', 0, MAX_LEN)
+                    
+                # Se non trova nemmeno uno spazio (improbabile), forza il taglio al limite
+                if punto_taglio == -1:
+                    punto_taglio = MAX_LEN
+                    
+                # Invia il blocco pulito
+                await update.message.reply_text(messaggio_completo[:punto_taglio])
+                
+                # Rimuove la parte inviata dalla stringa totale e toglie eventuali spazi vuoti all'inizio
+                messaggio_completo = messaggio_completo[punto_taglio:].lstrip()
+        else:
+            await update.message.reply_text("Non hai nessun piano attivo al momento. Usa /start per crearne uno nuovo.")
+    except Exception as e:
+        print(f"{datetime.isoformat()}: Errore {e}")
 async def cancella_piano(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Cancella il piano e disattiva il bot per l'utente."""
-    chat_id = update.effective_chat.id
-    
-    db.update_user_state(chat_id, "PAUSED", step=None)
-    db.update_user_profile(chat_id, "piano_corrente", None)
-    
-    await update.message.reply_text(
-        "🗑️ Il tuo piano di allenamento è stato cancellato definitivamente. L'analisi automatica di Strava è disattivata.\n\n"
-        "Usa /start se vorrai crearne uno nuovo in futuro."
-    )
-
+    try:
+        print("Richiesta Cancellazione piano")
+        chat_id = update.effective_chat.id
+        
+        db.update_user_state(chat_id, "PAUSED", step=None)
+        db.update_user_profile(chat_id, "piano_corrente", None)
+        
+        await update.message.reply_text(
+            "🗑️ Il tuo piano di allenamento è stato cancellato definitivamente. L'analisi automatica di Strava è disattivata.\n\n"
+            "Usa /start se vorrai crearne uno nuovo in futuro."
+        )
+    except Exception as e:
+        print(f"{datetime.isoformat()}: Errore {e}")
 async def uscite_settimanali(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Recupera e analizza le uscite della settimana da Strava su richiesta."""
     chat_id = update.effective_chat.id
     utente = db.get_user(chat_id)
-    
+    print("richiesta uscite settimanali")
     await update.message.reply_text("🔄 Sto interrogando i server di Strava per le attività di questa settimana...")
     try:
         dati_strava = strava.get_last_week_activities()
@@ -126,7 +130,7 @@ async def ultima_uscita(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Recupera e analizza l'ultima uscita da Strava su richiesta."""
     chat_id = update.effective_chat.id
     utente = db.get_user(chat_id)
-    
+    print("richiesta ultima uscita")
 
     await update.message.reply_text("🔄 Sto interrogando i server di Strava per la tua ultima attività...")
     
@@ -155,6 +159,7 @@ async def ultima_uscita(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Smista i messaggi di testo in base allo stato in cui si trova l'utente."""
+    print("richiesta creazione piano")
     chat_id = update.effective_chat.id
     testo = update.message.text
     
