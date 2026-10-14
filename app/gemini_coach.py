@@ -207,7 +207,29 @@ def aggiorna_piano(utente_aggiornato):
     
     #troviamo le uscite settimanali
     uscite_settimanali = strava.get_last_week_activities()
-    
+    uscite_formattate = ""
+    for uscite in uscite_settimanali:
+        uscite_formattate += f"""\n
+            Uscita {uscite.get('titolo')} in data {uscite.get('data')}.
+            
+            - Titolo attività: {uscite.get('titolo')}
+            - Distanza: {uscite.get('distanza_km')} km
+            - Dislivello: {uscite.get('dislivello_m')} m
+            - Tempo in movimento: {uscite.get('tempo_movimento_minuti')} minuti
+            - Frequenza Cardiaca: Media {uscite.get('fc_media')} bpm | Max {uscite.get('fc_max')} bpm
+            - Sforzo Relativo (Strava): {uscite.get('sforzo_relativo')}
+            
+            Distribuzione Zone Cardio:
+            {uscite.get('tempo_in_zone_cardio')}
+            
+            Distribuzione Zone Potenza:
+            {uscite.get('tempo_in_zone_potenza')}
+            
+            Segmenti rilevanti affrontati:
+            {uscite.get('segmenti_rilevanti')}
+            
+            ###################################
+            """
     prompt = f"""
         Aggiorna il piano per la prossima settimana fornendo dettagliatamente tutti gli allenamenti dal lunedi alla domenica.
         Di seguito ti ricordo i dati:
@@ -218,7 +240,7 @@ def aggiorna_piano(utente_aggiornato):
         FTP: {profilo.get("ftp")}
         
         Queste sono le uscite della settimana {week - 1}
-        {uscite_settimanali}
+        {uscite_formattate}
         
         Oggi siamo alla settimana {week}.
         

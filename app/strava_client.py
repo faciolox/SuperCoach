@@ -234,7 +234,6 @@ def get_last_week_activities():
             dati_puliti["segmenti_rilevanti"].append(f"{nome_segmento}: {tempo_formattato}{pr_flag}")
         attività_settimanali.append(dati_puliti)
     return attività_settimanali
-
 def get_this_week_activities():
     today = datetime.now()
     lun = today - timedelta(days=today.weekday())
