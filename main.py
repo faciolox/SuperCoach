@@ -41,6 +41,10 @@ async def lifespan(app: FastAPI):
 # Inizializza FastAPI
 app = FastAPI(lifespan=lifespan)
 
+@app.get("/")
+def read_root():
+    return {"status": "SuperCoach è sveglio!"}
+
 # 3. Endpoint per la verifica iniziale del Webhook di Strava
 @app.get("/webhook/strava")
 async def verify_strava(request: Request):
