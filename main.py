@@ -8,8 +8,11 @@ from app.bot_handlers import start, interrompi_piano, handle_text, mostra_piano,
 import app.database as db
 import app.strava_client as strava
 import app.gemini_coach as coach
-
-
+import app.database as db
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+import asyncio
+from datetime import datetime, date, timedelta
 load_dotenv()
 
 # 1. Configurazione del Bot Telegram
@@ -32,6 +35,14 @@ async def lifespan(app: FastAPI):
     await bot_app.start()
     await bot_app.updater.start_polling()
     print("✅ Bot Telegram avviato in modalità polling.")
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(
+        routine_settimanale_piani, # Assicurati che questa funzione sia definita sopra!
+        trigger=CronTrigger(day_of_week='mon', hour=10, minute=0, timezone='Europe/Rome')
+    )
+    scheduler.start()
+    print("⏰ Scheduler avviato: i piani verranno inviati ogni lunedì alle 07:00")
+
     yield
     print("🛑 Spegnimento del bot in corso...")
     await bot_app.updater.stop()
@@ -88,3 +99,60 @@ async def strava_webhook(request: Request):
                     await bot_app.bot.send_message(chat_id=chat_id, text=messaggio_finale, parse_mode='Markdown')
                     
     return {"status": "ok"}
+
+
+async def routine_settimanale_piani():
+    print("🌅 Inizio generazione automatica dei piani settimanali...")
+    
+    # 1. Recupera tutti gli utenti dal database MongoDB
+    utenti = db._load_db()
+    for chat_id, dati_utente in utenti.items():
+        # Opzionale: controlla se l'utente ha finito l'onboarding ed è attivo
+        if dati_utente.get("stato") == "ACTIVE":
+            print(f"Aggiornamento piano per l'utente {chat_id}...")
+            
+            try:
+                messaggio = coach.aggiorna_piano(dati_utente)
+                data_inizio = datetime.strptime(dati_utente["data inizio piano"],"%d/%m/%Y")
+                oggi = datetime.now()
+                delta = data_inizio - oggi
+                week = int(delta.days/7) +1
+                piano_generato = f"""
+                {dati_utente.get("piano_corrente")}
+                \n\n\n Questo il feedback della {week -1} e il programma aggiornato della {week}\n\n\n
+                {messaggio}
+                """
+                
+                db.update_user_profile(chat_id, "piano_corrente", piano_generato)
+                # invio il messaggio su telegram
+                messaggio_completo = f"Ecco l'aggiornamento del tuo piano:\n\n{messaggio}"
+                MAX_LEN = 4000
+        
+                while len(messaggio_completo) > 0:
+                    if len(messaggio_completo) <= MAX_LEN:
+                        await bot_app.bot.send_message(chat_id=chat_id, text=messaggio_completo)
+                        break
+                        
+                    # Cerca l'ultimo "a capo" entro il limite di 4000 caratteri
+                    punto_taglio = messaggio_completo.rfind('\n', 0, MAX_LEN)
+                    
+                    # Se non trova un "a capo", cerca l'ultimo spazio bianco
+                    if punto_taglio == -1:
+                        punto_taglio = messaggio_completo.rfind(' ', 0, MAX_LEN)
+                        
+                    # Se non trova nemmeno uno spazio (improbabile), forza il taglio al limite
+                    if punto_taglio == -1:
+                        punto_taglio = MAX_LEN
+                        
+                    # Invia il blocco pulito
+                    await bot_app.bot.send_message(chat_id=chat_id,text=messaggio_completo[:punto_taglio])
+                    
+                    # Rimuove la parte inviata dalla stringa totale e toglie eventuali spazi vuoti all'inizio
+                    messaggio_completo = messaggio_completo[punto_taglio:].lstrip()
+              
+                print(f"✅ Piano inviato con successo a {chat_id}")
+                
+                # Pausa di 2 secondi tra un utente e l'altro per non floodare le API di Telegram/Gemini
+                await asyncio.sleep(2)  
+            except Exception as e:
+                print(f"❌ Errore con l'utente {chat_id}: {e}")

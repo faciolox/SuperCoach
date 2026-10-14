@@ -88,7 +88,7 @@ async def uscite_settimanali(update: Update, context: ContextTypes.DEFAULT_TYPE)
     print("richiesta uscite settimanali")
     await update.message.reply_text("🔄 Sto interrogando i server di Strava per le attività di questa settimana...")
     try:
-        dati_strava = strava.get_last_week_activities()
+        dati_strava = strava.get_this_week_activities()
     except:
         await update.message.reply_text("❌ C'è stato un problema nell'estrazione dei dettagli dell'attività.")
         return
