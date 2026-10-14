@@ -2,7 +2,9 @@ import os
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime,date
+import app.database as db
+import app.strava_client as strava
 # Carica le variabili d'ambiente (inclusa GEMINI_API_KEY)
 load_dotenv()
 
@@ -196,3 +198,63 @@ def analizza_uscita(dati_strava_puliti: dict):
             # Salviamo un messaggio discorsivo che Telegram può effettivamente inviare senza crashare
             response = "Mi dispiace, si è verificato un errore durante l'elaborazione dei tuoi dati. Riprova tra poco."
             
+def aggiorna_piano(utente_aggiornato):
+    profilo = utente_aggiornato["profilo"]
+    data_inizio = datetime.strptime(profilo.get("data inizio piano"),"%d/%m/%Y")
+    oggi = datetime.now()
+    delta = data_inizio - oggi
+    week = int(delta.days/7) +1
+    
+    #troviamo le uscite settimanali
+    uscite_settimanali = strava.get_last_week_activities()
+    
+    prompt = f"""
+        Aggiorna il piano per la prossima settimana fornendo dettagliatamente tutti gli allenamenti dal lunedi alla domenica.
+        Di seguito ti ricordo i dati:
+        Obiettivo: {profilo.get("obiettivo")}
+        Data finale {profilo.get("timeline")}
+        Giorni disponibili: {profilo.get("giorni_disponibili")}
+        Zone HR: {profilo.get("zone_hr")}
+        FTP: {profilo.get("ftp")}
+        
+        Queste sono le uscite della settimana {week - 1}
+        {uscite_settimanali}
+        
+        Oggi siamo alla settimana {week}.
+        
+        Questo è il piano corrente:
+        {profilo.get("piano_corrente")}
+        
+        In base ai risultati degli alleamenti di questa settimana, al proseguo dell'allenamento, e ai dati inziali del profilo dell'atleta
+        regola gli allenamenti (se c'è bisogno) della settimana {week}
+    """
+    risposta_gemini = "ciao"
+    try:
+            now = datetime.now()
+            print(f"🕒 {now.strftime("%d/%m/%Y, %H:%M:%S")}: Richiesta API inviata a Gemini. Prompt:\n{prompt}")
+            # LA CHIAMATA A GEMINI DEVE STARE QUI DENTRO
+            risposta_gemini = client.models.generate_content(
+                model='gemini-pro-latest', # o il modello che usi
+                contents=prompt,
+                config=config_base
+            )
+            now2 = datetime.now()
+            time_delta = (now2-now).total_seconds()
+            print(f"✅ {now2.strftime('%d/%m/%Y, %H:%M:%S')}: Risposta elaborata con successo in {time_delta:.2f} secondi.")
+            if risposta_gemini.usage_metadata:
+                token_in = risposta_gemini.usage_metadata.prompt_token_count
+                token_out = risposta_gemini.usage_metadata.candidates_token_count
+                token_totali = risposta_gemini.usage_metadata.total_token_count
+                print(f"📊 Consumo Token: {token_in} (input) + {token_out} (output) = {token_totali} totali", flush=True)
+            
+            # Estraiamo il testo pulito per Telegram
+            response = risposta_gemini.text
+            
+    except Exception as e:
+        # Registriamo l'errore tecnico nel log di Render per fare debug
+        print(f"❌ {datetime.now().strftime('%d/%m/%Y, %H:%M:%S')} - ERRORE API GEMINI: {e}")
+        
+        # Salviamo un messaggio discorsivo che Telegram può effettivamente inviare senza crashare
+        response = "Mi dispiace, si è verificato un errore durante l'elaborazione dei tuoi dati. Riprova tra poco."
+    return response
+    
