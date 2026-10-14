@@ -35,7 +35,7 @@ async def mostra_piano(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         chat_id = update.effective_chat.id
         utente = db.get_user(chat_id)
-        print(f"{datetime.now.isoformat()}: Richiesta piano")
+        print(f" Richiesta piano")
         if utente.get("stato") == "ACTIVE" and "piano_corrente" in utente.get("profilo", {}):
             messaggio_completo = utente["profilo"]["piano_corrente"]
             
@@ -65,7 +65,7 @@ async def mostra_piano(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text("Non hai nessun piano attivo al momento. Usa /start per crearne uno nuovo.")
     except Exception as e:
-        print(f"{datetime.now.isoformat()}: Errore {e}")
+        print(f" Errore {e}")
 async def cancella_piano(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Cancella il piano e disattiva il bot per l'utente."""
     try:
@@ -80,7 +80,7 @@ async def cancella_piano(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Usa /start se vorrai crearne uno nuovo in futuro."
         )
     except Exception as e:
-        print(f"{datetime.now.isoformat()}: Errore {e}")
+        print(f" Errore {e}")
 async def uscite_settimanali(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Recupera e analizza le uscite della settimana da Strava su richiesta."""
     chat_id = update.effective_chat.id
