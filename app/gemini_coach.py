@@ -71,7 +71,7 @@ def genera_piano_allenamento(dati_utente: dict):
         print(f"🕒 {now.strftime("%d/%m/%Y, %H:%M:%S")}: Richiesta API inviata a Gemini. Prompt:\n{prompt}")
         # LA CHIAMATA A GEMINI DEVE STARE QUI DENTRO
         risposta_gemini = client.models.generate_content(
-            model='gemini-flash-latest', # o il modello che usi
+            model='gemini-pro-latest', # o il modello che usi
             contents=prompt,
             config=config_base
         )
