@@ -55,6 +55,7 @@ def genera_piano_allenamento(dati_utente: dict):
     """
     prompt = f"""
     Crea un piano di allenamento aggiornato basato su queste specifiche:
+    - Data inizio: {dati_utente.get("data inizio piano")}
     - Obiettivo principale: {dati_utente.get('obiettivo', 'Non specificato')}
     - Timeline/Scadenza: {dati_utente.get('timeline', 'Non specificata')}
     - Giorni a disposizione per allenarsi: {dati_utente.get('giorni_disponibili', 'Non specificati')}

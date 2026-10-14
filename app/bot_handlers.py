@@ -184,8 +184,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("4️⃣ Quali e' la tua FTP? Se non la conosci scrivi sconosciuta")
         elif step == 4:
             db.update_user_profile(chat_id,"ftp", testo)
-            db.update_user_state(chat_id, "ACTIVE", step=None)
-            
+            db.update_user_state(chat_id, "ONBOARDING", step=5)
+            await update.message.reply_text("Quando vuoi iniziare il piano?")
+        elif step == 5:
+            db.update_user_profile(chat_id,"data inizio piano", testo)
+            db.update_user_state(chat_id, "ACTIVE", step=None)   
             await update.message.reply_text("Perfetto! Sto elaborando il tuo profilo e generando il piano di allenamento con Gemini. Un attimo di pazienza... 🚴‍♂️")
             
             utente_aggiornato = db.get_user(chat_id)
