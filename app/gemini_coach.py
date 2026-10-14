@@ -79,6 +79,11 @@ def genera_piano_allenamento(dati_utente: dict):
         now2 = datetime.now()
         time_delta = (now2-now).total_seconds()
         print(f"✅ {now2.strftime('%d/%m/%Y, %H:%M:%S')}: Risposta elaborata con successo in {time_delta:.2f} secondi.")
+        if risposta_gemini.usage_metadata:
+            token_in = risposta_gemini.usage_metadata.prompt_token_count
+            token_out = risposta_gemini.usage_metadata.candidates_token_count
+            token_totali = risposta_gemini.usage_metadata.total_token_count
+            print(f"📊 Consumo Token: {token_in} (input) + {token_out} (output) = {token_totali} totali", flush=True)
         
         # Estraiamo il testo pulito per Telegram
         response = risposta_gemini.text
@@ -128,6 +133,11 @@ def analizza_uscite_settimanali(dati_strava_puliti:dict):
         now2 = datetime.now()
         time_delta = (now2-now).total_seconds()
         print(f"✅ {now2.strftime('%d/%m/%Y, %H:%M:%S')}: Risposta elaborata con successo in {time_delta:.2f}.")
+        if response.usage_metadata:
+            token_in = response.usage_metadata.prompt_token_count
+            token_out = response.usage_metadata.candidates_token_count
+            token_totali = response.usage_metadata.total_token_count
+            print(f"📊 Consumo Token: {token_in} (input) + {token_out} (output) = {token_totali} totali", flush=True)
         return response.text
     except Exception as e:
             # Registriamo l'errore tecnico nel log di Render per fare debug
@@ -173,6 +183,11 @@ def analizza_uscita(dati_strava_puliti: dict):
         now2 = datetime.now()
         time_delta = (now2-now).total_seconds()
         print(f"✅ {now2.strftime('%d/%m/%Y, %H:%M:%S')}: Risposta elaborata con successo in {time_delta:.2f}.")
+        if response.usage_metadata:
+            token_in = response.usage_metadata.prompt_token_count
+            token_out = response.usage_metadata.candidates_token_count
+            token_totali = response.usage_metadata.total_token_count
+            print(f"📊 Consumo Token: {token_in} (input) + {token_out} (output) = {token_totali} totali", flush=True)
         return response.text
     except Exception as e:
             # Registriamo l'errore tecnico nel log di Render per fare debug
