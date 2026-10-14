@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from dotenv import load_dotenv
-from app.bot_handlers import start, interrompi_piano, handle_text, mostra_piano, cancella_piano, ultima_uscita
+from app.bot_handlers import start, interrompi_piano, handle_text, mostra_piano, cancella_piano, ultima_uscita, uscite_settimanali
 import app.database as db
 import app.strava_client as strava
 import app.gemini_coach as coach
@@ -23,7 +23,7 @@ bot_app.add_handler(CommandHandler("piano", mostra_piano))
 bot_app.add_handler(CommandHandler("cancella", cancella_piano))
 bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 bot_app.add_handler(CommandHandler("ultima", ultima_uscita))
-
+bot_app.add_handler(CommandHandler("settimana",uscite_settimanali))
 
 # 2. Gestione del ciclo di vita dell'applicazione
 @asynccontextmanager

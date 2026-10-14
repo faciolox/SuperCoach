@@ -1,7 +1,8 @@
 import os
 import requests
 from dotenv import load_dotenv
-
+from datetime import datetime,timedelta
+import json
 # Carica le variabili d'ambiente
 load_dotenv()
 
@@ -153,3 +154,82 @@ def get_latest_activity_id():
             
     print(f"Errore nel recupero attività: {response.text}")
     return None
+
+def get_last_week_activities():
+    today = datetime.now()
+    lun = today - timedelta(days=today.weekday())
+    dom = today + timedelta(days=6-today.weekday())
+    
+    token = get_access_token() 
+    while True:  
+        number_activites = 7   
+        url = f"https://www.strava.com/api/v3/athlete/activities?per_page={number_activites}"
+        headers = {"Authorization": f"Bearer {token}"}
+        try:
+            response = requests.get(url, headers=headers)
+            activities = response.json() 
+            last_date = activities[-1]["start_date_local"][:10] 
+            
+            if last_date < lun.strftime("%Y-%m-%d"):
+                break
+            else:
+                number_activites += 1
+        except Exception as e:
+            print(e)
+    i = len(activities) -1
+    while i >= 0:
+        if activities[i]["start_date_local"][:10] < lun.strftime("%Y-%m-%d"):
+            activities.pop(i)
+            i -= 1
+        else:
+            break
+    attività_settimanali = []
+    for activity in activities:
+        zones = get_activity_zones(activity["id"])
+        dati_puliti = {
+                "titolo": activity.get("name"),
+                "data": activity.get("start_date_local")[:10],
+                "distanza_km": round(activity.get("distance", 0) / 1000, 2),
+                "dislivello_m": activity.get("total_elevation_gain"),
+                "tempo_movimento_minuti": round(activity.get("moving_time", 0) / 60, 1),
+                "fc_media": activity.get("average_heartrate"),
+                "fc_max": activity.get("max_heartrate"),
+                "sforzo_relativo": activity.get("suffer_score", "Non disponibile"),
+                "tempo_in_zone_cardio": [],
+                "tempo_in_zone_potenza": [],
+                "segmenti_rilevanti": []
+            }
+        for i, bucket in enumerate(zones.get("heartrate", [])):
+            minuti = round(bucket.get("time", 0) / 60, 1)
+            dati_puliti["tempo_in_zone_cardio"].append(f"Z{i+1}: {minuti} min")
+        if activity.get("device_watts") is True:
+            dati_puliti["potenza_media_w"] = activity.get("average_watts")
+            dati_puliti["potenza_max_w"] = activity.get("max_watts")
+            dati_puliti["potenza_normalizzata_w"] = activity.get("weighted_average_watts")
+            
+            for i, bucket in enumerate(zones.get("power", [])):
+                minuti = round(bucket.get("time", 0) / 60, 1)
+                dati_puliti["tempo_in_zone_potenza"].append(f"Z{i+1} (Power): {minuti} min")
+        else:
+            dati_puliti["tempo_in_zone_potenza"] = "Nessun misuratore di potenza rilevato (dati stimati ignorati)."
+        
+        # --- GESTIONE SEGMENTI ---
+        segment_efforts = activity.get("segment_efforts", [])
+        for effort in segment_efforts:
+            nome_segmento = effort.get("name")
+            tempo_secondi = effort.get("elapsed_time", 0)
+            
+            # Converte i secondi in un formato leggibile (es. "5m 30s")
+            minuti, secondi = divmod(tempo_secondi, 60)
+            tempo_formattato = f"{minuti}m {secondi}s"
+            
+            # Aggiungiamo un'icona se c'è un PR (Personal Record)
+            pr_flag = ""
+            for achievement in effort.get("achievements", []):
+                if achievement.get("type_id") in [2, 3]: # 2 = PR, 3 = Top 10
+                    pr_flag = " 🏆 (PR!)"
+                    break
+                    
+            dati_puliti["segmenti_rilevanti"].append(f"{nome_segmento}: {tempo_formattato}{pr_flag}")
+        attività_settimanali.append(dati_puliti)
+    return attività_settimanali

@@ -89,7 +89,52 @@ def genera_piano_allenamento(dati_utente: dict):
         # Salviamo un messaggio discorsivo che Telegram può effettivamente inviare senza crashare
         response = "Mi dispiace, si è verificato un errore durante l'elaborazione dei tuoi dati. Riprova tra poco."
     return response
-# 3. CRITICO DELLE PRESTAZIONI POST-ALLENAMENTO
+
+# 3. RELAZIONE ULTIME USCITE
+def analizza_uscite_settimanali(dati_strava_puliti:dict):
+    prompt = """Fornisci un commento tecnico sull'esecuzione delle uscite di questa settimana, valutando il carico interno 
+                (cuore) ed esterno (potenza/dislivello). Dimmi come questa uscita impatterà il recupero dei prossimi giorni."""
+    for uscite in dati_strava_puliti:
+        prompt += f"""\n
+            Uscita {uscite.get('titolo')} in data {uscite.get('data')}. Analizza i seguenti dati:
+            
+            - Titolo attività: {uscite.get('titolo')}
+            - Distanza: {uscite.get('distanza_km')} km
+            - Dislivello: {uscite.get('dislivello_m')} m
+            - Tempo in movimento: {uscite.get('tempo_movimento_minuti')} minuti
+            - Frequenza Cardiaca: Media {uscite.get('fc_media')} bpm | Max {uscite.get('fc_max')} bpm
+            - Sforzo Relativo (Strava): {uscite.get('sforzo_relativo')}
+            
+            Distribuzione Zone Cardio:
+            {uscite.get('tempo_in_zone_cardio')}
+            
+            Distribuzione Zone Potenza:
+            {uscite.get('tempo_in_zone_potenza')}
+            
+            Segmenti rilevanti affrontati:
+            {uscite.get('segmenti_rilevanti')}
+            
+            ###################################
+            """
+    try: 
+        now = datetime.now()
+        print(f"🕒 {now.strftime("%d/%m/%Y, %H:%M:%S")}: Richiesta API inviata a Gemini. Prompt:\n{prompt}")
+        response = client.models.generate_content(
+            model='gemini-flash-latest',
+            contents=prompt,
+            config=config_base
+        )
+        now2 = datetime.now()
+        time_delta = (now2-now).total_seconds()
+        print(f"✅ {now2.strftime('%d/%m/%Y, %H:%M:%S')}: Risposta elaborata con successo in {time_delta:.2f}.")
+        return response.text
+    except Exception as e:
+            # Registriamo l'errore tecnico nel log di Render per fare debug
+            print(f"❌ {datetime.now().strftime('%d/%m/%Y, %H:%M:%S')} - ERRORE API GEMINI: {e}")
+            
+            # Salviamo un messaggio discorsivo che Telegram può effettivamente inviare senza crashare
+            response = "Mi dispiace, si è verificato un errore durante l'elaborazione dei tuoi dati. Riprova tra poco."
+# 4. CRITICO DELLE PRESTAZIONI POST-ALLENAMENTO
 def analizza_uscita(dati_strava_puliti: dict):
     """
     Prende il dizionario formattato da strava_client.py e restituisce l'analisi tecnica.
@@ -134,3 +179,4 @@ def analizza_uscita(dati_strava_puliti: dict):
             
             # Salviamo un messaggio discorsivo che Telegram può effettivamente inviare senza crashare
             response = "Mi dispiace, si è verificato un errore durante l'elaborazione dei tuoi dati. Riprova tra poco."
+            

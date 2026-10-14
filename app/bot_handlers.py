@@ -4,6 +4,7 @@ import app.database as db
 from app.gemini_coach import genera_piano_allenamento
 import app.strava_client as strava
 from app.gemini_coach import analizza_uscita
+from app.gemini_coach import analizza_uscite_settimanali
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -76,6 +77,51 @@ async def cancella_piano(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Usa /start se vorrai crearne uno nuovo in futuro."
     )
 
+async def uscite_settimanali(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Recupera e analizza le uscite della settimana da Strava su richiesta."""
+    chat_id = update.effective_chat.id
+    utente = db.get_user(chat_id)
+    
+    await update.message.reply_text("🔄 Sto interrogando i server di Strava per le attività di questa settimana...")
+    try:
+        dati_strava = strava.get_last_week_activities()
+    except:
+        await update.message.reply_text("❌ C'è stato un problema nell'estrazione dei dettagli dell'attività.")
+        return
+    
+    if dati_strava:
+        try:
+            analisi = analizza_uscite_settimanali(dati_strava)
+        except:
+            await update.message.reply_text("❌ C'è stato un problema nell'estrazione dei dettagli dell'attività.")
+            return
+        messaggio_completo = f"Ecco l'analisi delle tue uscite:\n\n{analisi}"
+        MAX_LEN = 4000
+
+        while len(messaggio_completo) > 0:
+            if len(messaggio_completo) <= MAX_LEN:
+                await update.message.reply_text(messaggio_completo)
+                break
+                
+            # Cerca l'ultimo "a capo" entro il limite di 4000 caratteri
+            punto_taglio = messaggio_completo.rfind('\n', 0, MAX_LEN)
+            
+            # Se non trova un "a capo", cerca l'ultimo spazio bianco
+            if punto_taglio == -1:
+                punto_taglio = messaggio_completo.rfind(' ', 0, MAX_LEN)
+                
+            # Se non trova nemmeno uno spazio (improbabile), forza il taglio al limite
+            if punto_taglio == -1:
+                punto_taglio = MAX_LEN
+                
+            # Invia il blocco pulito
+            await update.message.reply_text(messaggio_completo[:punto_taglio])
+            
+            # Rimuove la parte inviata dalla stringa totale e toglie eventuali spazi vuoti all'inizio
+            messaggio_completo = messaggio_completo[punto_taglio:].lstrip()
+    else:
+        await update.message.reply_text("❌ C'è stato un problema nell'estrazione dei dettagli dell'attività.")
+
 async def ultima_uscita(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Recupera e analizza l'ultima uscita da Strava su richiesta."""
     chat_id = update.effective_chat.id
@@ -85,13 +131,20 @@ async def ultima_uscita(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔄 Sto interrogando i server di Strava per la tua ultima attività...")
     
     # 1. Trova l'ID
-    activity_id = strava.get_latest_activity_id()
+    try:
+        activity_id = strava.get_latest_activity_id()
+    except:
+        await update.message.reply_text("❌ C'è stato un problema nell'estrazione dei dettagli dell'attività.")
     if not activity_id:
         await update.message.reply_text("❌ Non ho trovato nessuna attività recente sul tuo profilo Strava o c'è un errore di connessione.")
         return
         
     # 2. Scarica i dati puliti (zone, segmenti, ecc.)
-    dati_strava = strava.format_strava_data_for_gemini(activity_id)
+    try:
+        dati_strava = strava.format_strava_data_for_gemini(activity_id)
+    except:
+        await update.message.reply_text("❌ C'è stato un problema nell'estrazione dei dettagli dell'attività.")
+        return
     
     if dati_strava:
         # 3. Passa i dati a Gemini
