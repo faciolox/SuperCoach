@@ -2,6 +2,7 @@ import os
 import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
+import telegram
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from dotenv import load_dotenv
 from app.bot_handlers import start, interrompi_piano, handle_text, mostra_piano, cancella_piano, ultima_uscita, uscite_settimanali
@@ -96,7 +97,11 @@ async def strava_webhook(request: Request):
             for chat_id, data in utenti.items():
                 if data.get("stato") == "ACTIVE":
                     messaggio_finale = f"🚴‍♂️ **Nuova attività rilevata!**\n\n{analisi_testo}"
-                    await bot_app.bot.send_message(chat_id=chat_id, text=messaggio_finale, parse_mode='Markdown')
+                    try:
+                        await bot_app.bot.send_message(chat_id=chat_id, text=messaggio_finale, parse_mode='Markdown')
+                    except telegram.error.BadRequest as e:
+                        print(f"⚠️ Errore Markdown intercettato: invio come testo semplice. Dettaglio: {e}")
+                        await bot_app.bot.send_message(chat_id=chat_id, text=messaggio_finale)
                     
     return {"status": "ok"}
 
