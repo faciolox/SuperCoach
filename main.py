@@ -119,20 +119,30 @@ async def routine_settimanale_piani():
             print(f"Aggiornamento piano per l'utente {chat_id}...")
             
             try:
-                messaggio = coach.aggiorna_piano(dati_utente)
                 data_inizio = datetime.strptime(dati_utente["data inizio piano"],"%d/%m/%Y")
                 oggi = datetime.now()
                 delta = data_inizio - oggi
                 week = int(delta.days/7) +1
-                piano_generato = f"""
-                {dati_utente.get("piano_corrente")}
-                \n\n\n Questo il feedback della {week -1} e il programma aggiornato della {week}\n\n\n
-                {messaggio}
-                """
-                
-                db.update_user_profile(chat_id, "piano_corrente", piano_generato)
+                if week == 1:
+                    utente = db.get_user(chat_id)
+                    print(f" Richiesta piano")
+                    if utente.get("stato") == "ACTIVE" and "piano_corrente" in utente.get("profilo", {}):
+                        messaggio = utente["profilo"]["piano_corrente"]
+                        messaggio_completo = f"Sei alla prima settimana! Ecco il tuo piano:\n\n{messaggio}"
+                else:    
+                    messaggio = coach.aggiorna_piano(dati_utente)
+                    
+                    
+                        
+                    piano_generato = f"""
+                    {dati_utente.get("piano_corrente")}
+                    \n\n\n Questo il feedback della {week -1} e il programma aggiornato della {week}\n\n\n
+                    {messaggio}
+                    """
+                    
+                    db.update_user_profile(chat_id, "piano_corrente", piano_generato)
                 # invio il messaggio su telegram
-                messaggio_completo = f"Ecco l'aggiornamento del tuo piano:\n\n{messaggio}"
+                    messaggio_completo = f"Ecco l'aggiornamento del tuo piano:\n\n{messaggio}"
                 MAX_LEN = 4000
         
                 while len(messaggio_completo) > 0:
