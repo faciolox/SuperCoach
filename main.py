@@ -90,7 +90,7 @@ async def strava_webhook(request: Request):
         
         if dati_strava:
             # Analizza con Gemini
-            uscita = db.get_activity(dati_strava["strava_id"])
+            uscita = db.get_activity(chat_id, dati_strava["strava_id"])
             if not uscita:
                 analisi_testo = coach.analizza_uscita(dati_strava)
                 
