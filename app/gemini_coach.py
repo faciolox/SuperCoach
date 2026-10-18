@@ -101,7 +101,7 @@ def genera_piano_allenamento(dati_utente: dict):
 # 3. RELAZIONE ULTIME USCITE
 def analizza_uscite_settimanali(dati_strava_puliti:dict):
     prompt = """Fornisci un commento tecnico sull'esecuzione delle uscite di questa settimana, valutando il carico interno 
-                (cuore) ed esterno (potenza/dislivello). Dimmi come questa uscita impatterà il recupero dei prossimi giorni."""
+                (cuore) ed esterno (potenza/dislivello). Dimmi come questa uscita impatterà il recupero dei prossimi giorni. Analizza queste attivita nei massimi dettagli una per uno e fai un recap"""
     output = ""
     for uscite in dati_strava_puliti:
         try:
@@ -112,7 +112,7 @@ def analizza_uscite_settimanali(dati_strava_puliti:dict):
             output += uscita.get("messaggio")
         else: 
             prompt += f"""\n
-                Uscita {uscite.get('titolo')} in data {uscite.get('data')}. Analizza i seguenti dati:
+                Uscita {uscite.get('titolo')} in data {uscite.get('data')}.
                 
                 - Titolo attività: {uscite.get('titolo')}
                 - Distanza: {uscite.get('distanza_km')} km
@@ -149,7 +149,7 @@ def analizza_uscite_settimanali(dati_strava_puliti:dict):
             token_totali = response.usage_metadata.total_token_count
             print(f"📊 Consumo Token: {token_in} (input) + {token_out} (output) = {token_totali} totali", flush=True)
         output += response.text
-        return response.text
+        return output
     except Exception as e:
             # Registriamo l'errore tecnico nel log di Render per fare debug
             print(f"❌ {datetime.now().strftime('%d/%m/%Y, %H:%M:%S')} - ERRORE API GEMINI: {e}")
