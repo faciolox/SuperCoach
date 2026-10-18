@@ -9,7 +9,7 @@ if not mongo_uri:
 client = MongoClient(mongo_uri)
 db_client = client["supercoach_db"]
 users_collection = db_client["users"]
-
+activities = db_client["activities"]
 # --- FUNZIONI DI GESTIONE UTENTI ---
 
 def get_user(chat_id):
@@ -48,3 +48,25 @@ def update_user_profile(chat_id, key, value):
         user["profilo"] = {}
     user["profilo"][key] = value
     save_user(chat_id, user)
+    
+    
+# --- FUNZIONI GESTIONE ATTIVITA' ---
+def get_activity(chat_id, id):
+    activity = activities.find_one({"activity_id": str(id)})
+    return activity if activity else {}
+
+def save_activity(chat_id, id, prompt="",messaggio=""):
+    activities.update_one(
+    {"chat_id": str(chat_id)},  # 1. Filtro: trova il documento con questo chat_id
+    {"$set": {                  # 2. Aggiornamento: imposta questi campi
+        "activity_id": str(id),
+        "prompt": str(prompt),
+        "messaggio": str(messaggio)
+        }},
+        upsert=True                 # 3. Opzioni: crea il documento se non esiste
+    )
+
+
+
+
+    

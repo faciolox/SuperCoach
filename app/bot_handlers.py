@@ -142,21 +142,26 @@ async def ultima_uscita(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not activity_id:
         await update.message.reply_text("❌ Non ho trovato nessuna attività recente sul tuo profilo Strava o c'è un errore di connessione.")
         return
-        
+    analisi = db.get_activity(chat_id, activity_id)
+    if not analisi:  
     # 2. Scarica i dati puliti (zone, segmenti, ecc.)
-    try:
-        dati_strava = strava.format_strava_data_for_gemini(activity_id)
-    except:
-        await update.message.reply_text("❌ C'è stato un problema nell'estrazione dei dettagli dell'attività.")
-        return
-    
-    if dati_strava:
-        # 3. Passa i dati a Gemini
-        analisi = analizza_uscita(dati_strava)
-        await update.message.reply_text(f"🚴‍♂️ **Report Ultima Uscita:**\n\n{analisi}")
+        try:
+            dati_strava = strava.format_strava_data_for_gemini(activity_id)
+        except:
+            await update.message.reply_text("❌ C'è stato un problema nell'estrazione dei dettagli dell'attività.")
+            return
+        
+        if dati_strava:
+            # 3. Passa i dati a Gemini
+            analisi = analizza_uscita(dati_strava)
+            db.save_activity(chat_id,activity_id,'',analisi)
+            await update.message.reply_text(f"🚴‍♂️ **Report Ultima Uscita:**\n\n{analisi}")
+        else:
+            await update.message.reply_text("❌ C'è stato un problema nell'estrazione dei dettagli dell'attività.")
     else:
-        await update.message.reply_text("❌ C'è stato un problema nell'estrazione dei dettagli dell'attività.")
-
+        await update.message.reply_text(f"🚴‍♂️ **Report Ultima Uscita:**\n\n{analisi}")
+        
+        
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Smista i messaggi di testo in base allo stato in cui si trova l'utente."""
     print("richiesta creazione piano")

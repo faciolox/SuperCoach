@@ -102,28 +102,36 @@ def genera_piano_allenamento(dati_utente: dict):
 def analizza_uscite_settimanali(dati_strava_puliti:dict):
     prompt = """Fornisci un commento tecnico sull'esecuzione delle uscite di questa settimana, valutando il carico interno 
                 (cuore) ed esterno (potenza/dislivello). Dimmi come questa uscita impatterà il recupero dei prossimi giorni."""
+    output = ""
     for uscite in dati_strava_puliti:
-        prompt += f"""\n
-            Uscita {uscite.get('titolo')} in data {uscite.get('data')}. Analizza i seguenti dati:
-            
-            - Titolo attività: {uscite.get('titolo')}
-            - Distanza: {uscite.get('distanza_km')} km
-            - Dislivello: {uscite.get('dislivello_m')} m
-            - Tempo in movimento: {uscite.get('tempo_movimento_minuti')} minuti
-            - Frequenza Cardiaca: Media {uscite.get('fc_media')} bpm | Max {uscite.get('fc_max')} bpm
-            - Sforzo Relativo (Strava): {uscite.get('sforzo_relativo')}
-            
-            Distribuzione Zone Cardio:
-            {uscite.get('tempo_in_zone_cardio')}
-            
-            Distribuzione Zone Potenza:
-            {uscite.get('tempo_in_zone_potenza')}
-            
-            Segmenti rilevanti affrontati:
-            {uscite.get('segmenti_rilevanti')}
-            
-            ###################################
-            """
+        try:
+            uscita = db.get_activity("",uscite['strava_id'])
+        except Exception as e:
+            print(e)
+        if uscita:
+            output += uscita["messaggio"]
+        else: 
+            prompt += f"""\n
+                Uscita {uscite.get('titolo')} in data {uscite.get('data')}. Analizza i seguenti dati:
+                
+                - Titolo attività: {uscite.get('titolo')}
+                - Distanza: {uscite.get('distanza_km')} km
+                - Dislivello: {uscite.get('dislivello_m')} m
+                - Tempo in movimento: {uscite.get('tempo_movimento_minuti')} minuti
+                - Frequenza Cardiaca: Media {uscite.get('fc_media')} bpm | Max {uscite.get('fc_max')} bpm
+                - Sforzo Relativo (Strava): {uscite.get('sforzo_relativo')}
+                
+                Distribuzione Zone Cardio:
+                {uscite.get('tempo_in_zone_cardio')}
+                
+                Distribuzione Zone Potenza:
+                {uscite.get('tempo_in_zone_potenza')}
+                
+                Segmenti rilevanti affrontati:
+                {uscite.get('segmenti_rilevanti')}
+                
+                ###################################
+                """
     try: 
         now = datetime.now()
         print(f"🕒 {now.strftime("%d/%m/%Y, %H:%M:%S")}: Richiesta API inviata a Gemini. Prompt:\n{prompt}")
@@ -140,6 +148,7 @@ def analizza_uscite_settimanali(dati_strava_puliti:dict):
             token_out = response.usage_metadata.candidates_token_count
             token_totali = response.usage_metadata.total_token_count
             print(f"📊 Consumo Token: {token_in} (input) + {token_out} (output) = {token_totali} totali", flush=True)
+        output += response.text
         return response.text
     except Exception as e:
             # Registriamo l'errore tecnico nel log di Render per fare debug
@@ -190,6 +199,7 @@ def analizza_uscita(dati_strava_puliti: dict):
             token_out = response.usage_metadata.candidates_token_count
             token_totali = response.usage_metadata.total_token_count
             print(f"📊 Consumo Token: {token_in} (input) + {token_out} (output) = {token_totali} totali", flush=True)
+            db.save_activity("",dati_strava_puliti["strava_id"], prompt, response.text)
         return response.text
     except Exception as e:
             # Registriamo l'errore tecnico nel log di Render per fare debug

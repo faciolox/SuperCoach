@@ -48,26 +48,64 @@ def get_activity_details(activity_id: int):
         
     return response.json()
 
+def calcola_zone_potenza_reali(watt_array):
+    # Inizializza i contatori dei secondi passati in ogni zona
+    zone = {"Z1": 0, "Z2": 0, "Z3": 0, "Z4": 0, "Z5": 0,"Z6": 0,"Z7": 0}
+    
+    for watt in watt_array:
+        if watt < 114:
+            zone["Z1"] += 1
+        elif 115 <= watt <= 155:
+            zone["Z2"] += 1
+        elif 156 <= watt <= 186:
+            zone["Z3"] += 1
+        elif 187 <= watt <= 217:
+            zone["Z4"] += 1
+        elif 248 <= watt >= 218:
+            zone["Z5"] += 1
+        elif 249 > watt < 249:
+            zone["Z6"] += 1
+        else:
+            zone["Z7"] += 1
+            
+    # Converte i secondi in minuti per una lettura più facile
+    zone_minuti = {k: round(v / 60, 1) for k, v in zone.items()}
+    return zone_minuti
 
 def get_activity_zones(activity_id: int):
     """
-    Scarica le zone sia di frequenza cardiaca che di potenza.
+    Scarica le zone di frequenza cardiaca dall'API standard 
+    e calcola manualmente le zone di potenza reali dallo stream.
     """
     access_token = get_access_token()
-    url = f"https://www.strava.com/api/v3/activities/{activity_id}/zones"
     headers = {"Authorization": f"Bearer {access_token}"}
     
-    response = requests.get(url, headers=headers)
+    zones_data = {"heartrate": [], "power": {}}
     
-    zones_data = {"heartrate": [], "power": []}
+    # --- 1. RECUPERO ZONE CARDIO (Endpoint Standard) ---
+    url_zones = f"https://www.strava.com/api/v3/activities/{activity_id}/zones"
+    response_zones = requests.get(url_zones, headers=headers)
     
-    if response.status_code == 200:
-        for metric in response.json():
+    if response_zones.status_code == 200:
+        for metric in response_zones.json():
+            # Prendiamo SOLO il cuore. Ignoriamo la potenza fittizia di Strava.
             if metric.get("type") == "heartrate":
                 zones_data["heartrate"] = metric.get("distribution_buckets", [])
-            elif metric.get("type") == "power":
-                zones_data["power"] = metric.get("distribution_buckets", [])
                 
+    # --- 2. CALCOLO ZONE POTENZA (Endpoint Streams) ---
+    url_streams = f"https://www.strava.com/api/v3/activities/{activity_id}/streams?keys=watts&key_by_type=true"
+    response_streams = requests.get(url_streams, headers=headers)
+    
+    if response_streams.status_code == 200:
+        dati_stream = response_streams.json()
+        
+        # Controlliamo che l'attività abbia effettivamente i dati di potenza (es. se sei sui rulli)
+        if "watts" in dati_stream:
+            watt_array = dati_stream["watts"]["data"]
+            zones_data["power"] = calcola_zone_potenza_reali(watt_array)
+        else:
+            print("Nessun dato di potenza trovato in questa attività (forse uscita solo outdoor senza misuratore?).")
+            
     return zones_data
 
 
@@ -82,6 +120,7 @@ def format_strava_data_for_gemini(activity_id: int):
     zones = get_activity_zones(activity_id)
     
     dati_puliti = {
+        "strava_id": activity_id,
         "titolo": details.get("name"),
         "distanza_km": round(details.get("distance", 0) / 1000, 2),
         "dislivello_m": details.get("total_elevation_gain"),
@@ -107,8 +146,8 @@ def format_strava_data_for_gemini(activity_id: int):
         dati_puliti["potenza_normalizzata_w"] = details.get("weighted_average_watts")
         
         for i, bucket in enumerate(zones.get("power", [])):
-            minuti = round(bucket.get("time", 0) / 60, 1)
-            dati_puliti["tempo_in_zone_potenza"].append(f"Z{i+1} (Power): {minuti} min")
+            minuti = zones["power"][bucket]
+            dati_puliti["tempo_in_zone_potenza"].append(f"{bucket} (Power): {minuti} min")
     else:
         dati_puliti["tempo_in_zone_potenza"] = "Nessun misuratore di potenza rilevato (dati stimati ignorati)."
 
@@ -186,7 +225,8 @@ def get_last_week_activities():
             break
     attività_settimanali = []
     for activity in activities:
-        zones = get_activity_zones(activity["id"])
+        dati_puliti = format_strava_data_for_gemini(activity["id"])
+        """zones = get_activity_zones(activity["id"])
         dati_puliti = {
                 "titolo": activity.get("name"),
                 "data": activity.get("start_date_local")[:10],
@@ -231,7 +271,7 @@ def get_last_week_activities():
                     pr_flag = " 🏆 (PR!)"
                     break
                     
-            dati_puliti["segmenti_rilevanti"].append(f"{nome_segmento}: {tempo_formattato}{pr_flag}")
+            dati_puliti["segmenti_rilevanti"].append(f"{nome_segmento}: {tempo_formattato}{pr_flag}")"""
         attività_settimanali.append(dati_puliti)
     return attività_settimanali
 def get_this_week_activities():
@@ -240,8 +280,9 @@ def get_this_week_activities():
     dom = today + timedelta(days=6-today.weekday())
     
     token = get_access_token() 
+    number_activites = 7
     while True:  
-        number_activites = 7   
+           
         url = f"https://www.strava.com/api/v3/athlete/activities?per_page={number_activites}"
         headers = {"Authorization": f"Bearer {token}"}
         try:
@@ -264,51 +305,7 @@ def get_this_week_activities():
             break
     attività_settimanali = []
     for activity in activities:
-        zones = get_activity_zones(activity["id"])
-        dati_puliti = {
-                "titolo": activity.get("name"),
-                "data": activity.get("start_date_local")[:10],
-                "distanza_km": round(activity.get("distance", 0) / 1000, 2),
-                "dislivello_m": activity.get("total_elevation_gain"),
-                "tempo_movimento_minuti": round(activity.get("moving_time", 0) / 60, 1),
-                "fc_media": activity.get("average_heartrate"),
-                "fc_max": activity.get("max_heartrate"),
-                "sforzo_relativo": activity.get("suffer_score", "Non disponibile"),
-                "tempo_in_zone_cardio": [],
-                "tempo_in_zone_potenza": [],
-                "segmenti_rilevanti": []
-            }
-        for i, bucket in enumerate(zones.get("heartrate", [])):
-            minuti = round(bucket.get("time", 0) / 60, 1)
-            dati_puliti["tempo_in_zone_cardio"].append(f"Z{i+1}: {minuti} min")
-        if activity.get("device_watts") is True:
-            dati_puliti["potenza_media_w"] = activity.get("average_watts")
-            dati_puliti["potenza_max_w"] = activity.get("max_watts")
-            dati_puliti["potenza_normalizzata_w"] = activity.get("weighted_average_watts")
-            
-            for i, bucket in enumerate(zones.get("power", [])):
-                minuti = round(bucket.get("time", 0) / 60, 1)
-                dati_puliti["tempo_in_zone_potenza"].append(f"Z{i+1} (Power): {minuti} min")
-        else:
-            dati_puliti["tempo_in_zone_potenza"] = "Nessun misuratore di potenza rilevato (dati stimati ignorati)."
+        dati_puliti = format_strava_data_for_gemini(activity["id"])
         
-        # --- GESTIONE SEGMENTI ---
-        segment_efforts = activity.get("segment_efforts", [])
-        for effort in segment_efforts:
-            nome_segmento = effort.get("name")
-            tempo_secondi = effort.get("elapsed_time", 0)
-            
-            # Converte i secondi in un formato leggibile (es. "5m 30s")
-            minuti, secondi = divmod(tempo_secondi, 60)
-            tempo_formattato = f"{minuti}m {secondi}s"
-            
-            # Aggiungiamo un'icona se c'è un PR (Personal Record)
-            pr_flag = ""
-            for achievement in effort.get("achievements", []):
-                if achievement.get("type_id") in [2, 3]: # 2 = PR, 3 = Top 10
-                    pr_flag = " 🏆 (PR!)"
-                    break
-                    
-            dati_puliti["segmenti_rilevanti"].append(f"{nome_segmento}: {tempo_formattato}{pr_flag}")
         attività_settimanali.append(dati_puliti)
     return attività_settimanali
