@@ -90,18 +90,20 @@ async def strava_webhook(request: Request):
         
         if dati_strava:
             # Analizza con Gemini
-            analisi_testo = coach.analizza_uscita(dati_strava)
-            
-            # Invia a tutti gli utenti attivi
-            utenti = db._load_db()
-            for chat_id, data in utenti.items():
-                if data.get("stato") == "ACTIVE":
-                    messaggio_finale = f"🚴‍♂️ **Nuova attività rilevata!**\n\n{analisi_testo}"
-                    try:
-                        await bot_app.bot.send_message(chat_id=chat_id, text=messaggio_finale, parse_mode='Markdown')
-                    except telegram.error.BadRequest as e:
-                        print(f"⚠️ Errore Markdown intercettato: invio come testo semplice. Dettaglio: {e}")
-                        await bot_app.bot.send_message(chat_id=chat_id, text=messaggio_finale)
+            uscita = db.get_activity(dati_strava["strava_id"])
+            if not uscita:
+                analisi_testo = coach.analizza_uscita(dati_strava)
+                
+                # Invia a tutti gli utenti attivi
+                utenti = db._load_db()
+                for chat_id, data in utenti.items():
+                    if data.get("stato") == "ACTIVE":
+                        messaggio_finale = f"🚴‍♂️ **Nuova attività rilevata!**\n\n{analisi_testo}"
+                        try:
+                            await bot_app.bot.send_message(chat_id=chat_id, text=messaggio_finale, parse_mode='Markdown')
+                        except telegram.error.BadRequest as e:
+                            print(f"⚠️ Errore Markdown intercettato: invio come testo semplice. Dettaglio: {e}")
+                            await bot_app.bot.send_message(chat_id=chat_id, text=messaggio_finale)
                     
     return {"status": "ok"}
 
