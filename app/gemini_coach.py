@@ -109,7 +109,7 @@ def analizza_uscite_settimanali(dati_strava_puliti:dict):
         except Exception as e:
             print(e)
         if uscita:
-            output += uscita["messaggio"]
+            output += uscita.get("messaggio")
         else: 
             prompt += f"""\n
                 Uscita {uscite.get('titolo')} in data {uscite.get('data')}. Analizza i seguenti dati:
