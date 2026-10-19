@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
     scheduler = AsyncIOScheduler()
     scheduler.add_job(
         routine_settimanale_piani, # Assicurati che questa funzione sia definita sopra!
-        trigger=CronTrigger(day_of_week='mon', hour=10, minute=0, timezone='Europe/Rome')
+        trigger=CronTrigger(day_of_week='mon', hour=10, minute=15, timezone='Europe/Rome')
     )
     scheduler.start()
     print("⏰ Scheduler avviato: i piani verranno inviati ogni lunedì alle 07:00")
