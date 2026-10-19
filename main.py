@@ -119,7 +119,7 @@ async def routine_settimanale_piani():
             print(f"Aggiornamento piano per l'utente {chat_id}...")
             
             try:
-                data_inizio = datetime.strptime(dati_utente["data inizio piano"],"%d/%m/%Y")
+                data_inizio = datetime.strptime(dati_utente["profilo"]["data inizio piano"],"%d/%m/%Y")
                 oggi = datetime.now()
                 delta = data_inizio - oggi
                 week = int(delta.days/7) +1
