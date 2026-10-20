@@ -30,6 +30,10 @@ client = genai.Client(api_key=chiave_api)
 istruzioni_di_sistema = f"""
 Sei un preparatore atletico d'élite specializzato nel ciclismo su strada e data-driven.
 {info_personali}
+
+Rispondi sempre in modo schematico. gli allenamenti devono essere scritti in modo tale da poter essere presi e inseriti in un database prendendo la stringa di risposta a questa query. Non citare questa cosa nella tua risposta. 
+Non fare tabelle o elementi grafici in quanto il messaggio dovra essere mandato su un messaggio telegram.
+Per ogni allenamento di ciclismo dai un indicatore incrementale (da 1 in poi)
 Regole per i feedback e i piani:
 1. Analizza sempre il tempo speso nelle diverse zone (Z1-Z5).
 2. Verifica se i segmenti hanno richiesto sforzi fuori soglia e come questo impatta il recupero.
@@ -38,8 +42,15 @@ Regole per i feedback e i piani:
 5. Per i giorni lavorativi usa degli allenamenti idoneei al rullo e a zwift, facendo lavori usando il misuratore di potenza, mentre per il fine settimana pianifica allenamenti per uscite outdoor quindi senza misuratore di potenza
 6. Varia e non fare lo stesso allenamento due volte consecutive
 7. Per i lavori sui rulli fai sempre riferimento ad allenamenti secondo le zone di potenza
+8. Per ogni allenamento specifica lo sport da usare in modo da poter filtrare solo gli allenamenti di ciclismo
 
-
+Struttura ogni singolo allenamento cosi:
+Sport:
+ID: 
+Data:
+Titolo:
+Durata:
+Dettaglio:
 
 {testo_manuale}
 """
@@ -67,8 +78,9 @@ def genera_piano_allenamento(dati_utente: dict):
     
     Genera un programma strutturato giorno per giorno. Evidenzia chiaramente i giorni di riposo, 
     le sessioni di qualità e i lunghi. Specifica i minuti da passare in ciascuna zona.
+    Crea le prime due settimane considerato che ogni settimana il piano verra' aggiornato 
     """
-    
+    response = ""
     try:
         now = datetime.now()
         print(f"🕒 {now.strftime("%d/%m/%Y, %H:%M:%S")}: Richiesta API inviata a Gemini. Prompt:\n{prompt}")
@@ -89,7 +101,7 @@ def genera_piano_allenamento(dati_utente: dict):
         
         # Estraiamo il testo pulito per Telegram
         response = risposta_gemini.text
-        
+        print(response)
     except Exception as e:
         # Registriamo l'errore tecnico nel log di Render per fare debug
         print(f"❌ {datetime.now().strftime('%d/%m/%Y, %H:%M:%S')} - ERRORE API GEMINI: {e}")
@@ -214,7 +226,7 @@ def aggiorna_piano(utente_aggiornato):
     oggi = datetime.now()
     delta = data_inizio - oggi
     week = int(delta.days/7) +1
-    
+    piano = db.get_plan(utente_aggiornato["chat_id"])
     #troviamo le uscite settimanali
     uscite_settimanali = strava.get_last_week_activities()
     uscite_formattate = ""
@@ -242,6 +254,7 @@ def aggiorna_piano(utente_aggiornato):
             """
     prompt = f"""
         Aggiorna il piano per la prossima settimana fornendo dettagliatamente tutti gli allenamenti dal lunedi alla domenica.
+        Il piano deve essere scritto schematicamente in modo che ogni allenamento possa essere inserito in un database.
         Di seguito ti ricordo i dati:
         Obiettivo: {profilo.get("obiettivo")}
         Data finale {profilo.get("timeline")}
@@ -255,10 +268,16 @@ def aggiorna_piano(utente_aggiornato):
         Oggi siamo alla settimana {week}.
         
         Questo è il piano corrente:
-        {profilo.get("piano_corrente")}
+        {piano}
         
         In base ai risultati degli alleamenti di questa settimana, al proseguo dell'allenamento, e ai dati inziali del profilo dell'atleta
-        regola gli allenamenti (se c'è bisogno) della settimana {week}
+        crea gli allenamenti della prossima settimana (se c'e bisogno) seguendo questa struttura per ogni singolo allenamento:
+        Sport:
+        ID: 
+        Data:
+        Titolo:
+        Durata:
+        Dettaglio:
     """
     risposta_gemini = "ciao"
     try:

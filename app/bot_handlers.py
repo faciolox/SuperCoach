@@ -34,11 +34,16 @@ async def mostra_piano(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mostra il piano attualmente salvato in memoria."""
     try:
         chat_id = update.effective_chat.id
-        utente = db.get_user(chat_id)
+        piano = db.get_plan(chat_id)
         print(f" Richiesta piano")
-        if utente.get("stato") == "ACTIVE" and "piano_corrente" in utente.get("profilo", {}):
-            messaggio_completo = utente["profilo"]["piano_corrente"]
-            
+        if piano:
+            messaggio_completo = []
+            for workout in piano:
+                for k,v in workout.items():
+                    messaggio_completo.append(f"{k}: {v}")
+                messaggio_completo.append("")
+            messaggio_completo = "\n".join(messaggio_completo).strip()
+        if messaggio_completo:     
             MAX_LEN = 4000
             
             while len(messaggio_completo) > 0:

@@ -1,10 +1,11 @@
 import os
 from pymongo import MongoClient
-
+import re
 # Connessione al database
 mongo_uri = os.getenv("MONGO_URI")
 activity_name = os.getenv("ACTIVITY_DB")
 users_name = os.getenv("USERS_DB")
+plans_name = os.getenv("PLANS_DB")
 if not mongo_uri:
     print("⚠️ Attenzione: Variabile MONGO_URI mancante!")
 
@@ -12,6 +13,7 @@ client = MongoClient(mongo_uri)
 db_client = client["supercoach_db"]
 users_collection = db_client[users_name]
 activities = db_client[activity_name]
+plans_collection = db_client[plans_name]
 # --- FUNZIONI DI GESTIONE UTENTI ---
 
 def get_user(chat_id):
@@ -98,4 +100,46 @@ def get_activity_set(chat_id: str, min:int=0, max:int =5) -> list:
     
     return activities_out
 
+def save_plan(chat_id:str):
+    """Given a chat_id save the relative plan on plan_db
+
+    Args:
+        chat_id (str)
+    """
+    user = users_collection.find_one({"chat_id":str(chat_id)})
+    plan = user["profilo"]["piano_corrente"]
+    blocks = re.split(r'\n(?=Sport:)', plan.strip())
+    workouts = []
+    for block in blocks:
+        if not block.startswith("Sport:"):
+            continue
+        
+        workout = {}
+        for line in block.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+            
+            if ':' in line:
+                key, value = line.split(':',1)
+                workout[key.strip()] = value.strip()
+            
+        if workout:
+            workouts.append(workout)  
+    plans_collection.update_one(
+        {"chat_id":str(chat_id)},
+        {"$set": {"workouts": workouts}},
+        upsert=True
+        ) 
     
+def get_plan(chat_id) -> list:
+    """Return the plan for the relative chat_id
+
+    Args:
+        chat_id (_type_): 
+
+    Returns:
+        list: list of the workouts planned
+    """
+    plan = plans_collection.find_one({"chat_id":str(chat_id)})
+    return plan.get("workouts") if plan.get("workouts") else {}

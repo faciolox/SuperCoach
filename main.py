@@ -141,7 +141,8 @@ async def routine_settimanale_piani():
                     """
                     
                     db.update_user_profile(chat_id, "piano_corrente", piano_generato)
-                # invio il messaggio su telegram
+                    db.save_plan(chat_id)
+                    # invio il messaggio su telegram
                     messaggio_completo = f"Ecco l'aggiornamento del tuo piano:\n\n{messaggio}"
                 MAX_LEN = 4000
         
