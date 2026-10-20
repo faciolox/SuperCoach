@@ -3,13 +3,15 @@ from pymongo import MongoClient
 
 # Connessione al database
 mongo_uri = os.getenv("MONGO_URI")
+activity_name = os.getenv("ACTIVITY_DB")
+users_name = os.getenv("USERS_DB")
 if not mongo_uri:
     print("⚠️ Attenzione: Variabile MONGO_URI mancante!")
 
 client = MongoClient(mongo_uri)
 db_client = client["supercoach_db"]
-users_collection = db_client["users"]
-activities = db_client["activities"]
+users_collection = db_client[users_name]
+activities = db_client[activity_name]
 # --- FUNZIONI DI GESTIONE UTENTI ---
 
 def get_user(chat_id):
@@ -53,6 +55,8 @@ def update_user_profile(chat_id, key, value):
 # --- FUNZIONI GESTIONE ATTIVITA' ---
 def get_activity(chat_id, id):
     activity = activities.find_one({"activity_id": str(id)})
+    if activity.get("chat_id") != chat_id:
+        return {}
     return activity if activity else {}
 
 def save_activity(chat_id, id, prompt="",messaggio=""):
@@ -67,6 +71,31 @@ def save_activity(chat_id, id, prompt="",messaggio=""):
     )
 
 
+def get_activity_set(chat_id: str, min:int=0, max:int =5) -> list:
+    """Returns a set of the activity saved for that chat_id. You can also set a range, setted by default to the last 5 activities
 
+    Args:
+        chat_id (str): Chat id of the user
+        min (int, optional): minimum limit of the array. Defaults to 0.
+        max (int, optional): maximum limit of the array. Defaults to 5.
+
+    Returns:
+        list: set of the activity in the range selected
+    """
+    set_activity = activities.find({"chat_id":chat_id})
+    if set_activity:
+        set_activity= set_activity.distinct("activity_id")
+        i=0
+        activities_out = []
+        for id in set_activity:
+            if i < min:
+                i += 1
+            elif i >= max:
+                return activities_out
+            else:
+                activity = get_activity(chat_id,id)
+                activities_out.append(activity)
+    
+    return activities_out
 
     

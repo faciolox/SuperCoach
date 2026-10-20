@@ -160,7 +160,8 @@ async def ultima_uscita(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ C'è stato un problema nell'estrazione dei dettagli dell'attività.")
     else:
         await update.message.reply_text(f"🚴‍♂️ **Report Ultima Uscita:**\n\n{analisi.get("messaggio")}")
-        
+
+      
         
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Smista i messaggi di testo in base allo stato in cui si trova l'utente."""
