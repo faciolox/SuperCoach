@@ -61,9 +61,9 @@ def get_activity(chat_id, id):
 
 def save_activity(chat_id, id, prompt="",messaggio=""):
     activities.update_one(
-    {"chat_id": str(chat_id)},  # 1. Filtro: trova il documento con questo chat_id
+    {"activity_id": str(id)},  # 1. Filtro: trova il documento con questo activity_id
     {"$set": {                  # 2. Aggiornamento: imposta questi campi
-        "activity_id": str(id),
+        "chat_id": str(chat_id),
         "prompt": str(prompt),
         "messaggio": str(messaggio)
         }},

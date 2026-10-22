@@ -199,7 +199,6 @@ def analizza_uscita(dati_strava_puliti: dict):
             token_out = response.usage_metadata.candidates_token_count
             token_totali = response.usage_metadata.total_token_count
             print(f"📊 Consumo Token: {token_in} (input) + {token_out} (output) = {token_totali} totali", flush=True)
-            db.save_activity("",dati_strava_puliti["strava_id"], prompt, response.text)
         return response.text
     except Exception as e:
             # Registriamo l'errore tecnico nel log di Render per fare debug

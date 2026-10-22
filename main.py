@@ -93,7 +93,7 @@ async def strava_webhook(request: Request):
             uscita = db.get_activity("", dati_strava["strava_id"])
             if not uscita:
                 analisi_testo = coach.analizza_uscita(dati_strava)
-                
+                db.save_activity(chat_id,activity_id,'',analisi_testo)
                 # Invia a tutti gli utenti attivi
                 utenti = db._load_db()
                 for chat_id, data in utenti.items():
