@@ -118,9 +118,11 @@ def format_strava_data_for_gemini(activity_id: int):
         return None
         
     zones = get_activity_zones(activity_id)
-    
+    start = datetime.strptime(details["start_date_local"], "%Y-%m-%dT%H:%M:%SZ")
+
     dati_puliti = {
         "strava_id": activity_id,
+        "Start time": start.strftime("%d-%m-%Y"), 
         "titolo": details.get("name"),
         "distanza_km": round(details.get("distance", 0) / 1000, 2),
         "dislivello_m": details.get("total_elevation_gain"),
@@ -226,52 +228,6 @@ def get_last_week_activities():
     attività_settimanali = []
     for activity in activities:
         dati_puliti = format_strava_data_for_gemini(activity["id"])
-        """zones = get_activity_zones(activity["id"])
-        dati_puliti = {
-                "titolo": activity.get("name"),
-                "data": activity.get("start_date_local")[:10],
-                "distanza_km": round(activity.get("distance", 0) / 1000, 2),
-                "dislivello_m": activity.get("total_elevation_gain"),
-                "tempo_movimento_minuti": round(activity.get("moving_time", 0) / 60, 1),
-                "fc_media": activity.get("average_heartrate"),
-                "fc_max": activity.get("max_heartrate"),
-                "sforzo_relativo": activity.get("suffer_score", "Non disponibile"),
-                "tempo_in_zone_cardio": [],
-                "tempo_in_zone_potenza": [],
-                "segmenti_rilevanti": []
-            }
-        for i, bucket in enumerate(zones.get("heartrate", [])):
-            minuti = round(bucket.get("time", 0) / 60, 1)
-            dati_puliti["tempo_in_zone_cardio"].append(f"Z{i+1}: {minuti} min")
-        if activity.get("device_watts") is True:
-            dati_puliti["potenza_media_w"] = activity.get("average_watts")
-            dati_puliti["potenza_max_w"] = activity.get("max_watts")
-            dati_puliti["potenza_normalizzata_w"] = activity.get("weighted_average_watts")
-            
-            for i, bucket in enumerate(zones.get("power", [])):
-                minuti = round(bucket.get("time", 0) / 60, 1)
-                dati_puliti["tempo_in_zone_potenza"].append(f"Z{i+1} (Power): {minuti} min")
-        else:
-            dati_puliti["tempo_in_zone_potenza"] = "Nessun misuratore di potenza rilevato (dati stimati ignorati)."
-        
-        # --- GESTIONE SEGMENTI ---
-        segment_efforts = activity.get("segment_efforts", [])
-        for effort in segment_efforts:
-            nome_segmento = effort.get("name")
-            tempo_secondi = effort.get("elapsed_time", 0)
-            
-            # Converte i secondi in un formato leggibile (es. "5m 30s")
-            minuti, secondi = divmod(tempo_secondi, 60)
-            tempo_formattato = f"{minuti}m {secondi}s"
-            
-            # Aggiungiamo un'icona se c'è un PR (Personal Record)
-            pr_flag = ""
-            for achievement in effort.get("achievements", []):
-                if achievement.get("type_id") in [2, 3]: # 2 = PR, 3 = Top 10
-                    pr_flag = " 🏆 (PR!)"
-                    break
-                    
-            dati_puliti["segmenti_rilevanti"].append(f"{nome_segmento}: {tempo_formattato}{pr_flag}")"""
         attività_settimanali.append(dati_puliti)
     return attività_settimanali
 def get_this_week_activities():

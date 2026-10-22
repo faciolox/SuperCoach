@@ -162,7 +162,7 @@ def analizza_uscita(dati_strava_puliti: dict):
     Prende il dizionario formattato da strava_client.py e restituisce l'analisi tecnica.
     """
     prompt = f"""
-    L'atleta ha appena salvato una nuova uscita su Strava. Analizza i seguenti dati:
+    L'atleta ha appena salvato una nuova uscita su Strava il {dati_strava_puliti.get("Start time")}. Analizza i seguenti dati:
     
     - Titolo attività: {dati_strava_puliti.get('titolo')}
     - Distanza: {dati_strava_puliti.get('distanza_km')} km
