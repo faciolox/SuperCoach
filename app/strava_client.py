@@ -53,19 +53,23 @@ def calcola_zone_potenza_reali(watt_array):
     zone = {"Z1": 0, "Z2": 0, "Z3": 0, "Z4": 0, "Z5": 0,"Z6": 0,"Z7": 0}
     
     for watt in watt_array:
+        if watt is None:  # campioni mancanti nello stream (pause, perdita segnale)
+            continue
+        # Ogni ramo controlla solo il limite superiore: quello inferiore
+        # è già garantito dal fatto che i rami precedenti sono falliti
         if watt <= 114:
             zone["Z1"] += 1
-        elif 114 < watt <= 156:
+        elif watt <= 155:
             zone["Z2"] += 1
-        elif 156 < watt <= 186:
+        elif watt <= 186:
             zone["Z3"] += 1
-        elif 186 < watt <= 217:
+        elif watt <= 217:
             zone["Z4"] += 1
-        elif 249 >= watt > 217:
+        elif watt <= 248:
             zone["Z5"] += 1
-        elif 249 > watt <= 311:
+        elif watt <= 311:
             zone["Z6"] += 1
-        elif watt > 311:
+        else:
             zone["Z7"] += 1
             
     # Converte i secondi in minuti per una lettura più facile

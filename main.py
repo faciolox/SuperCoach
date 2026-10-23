@@ -5,7 +5,8 @@ from fastapi import FastAPI, Request
 import telegram
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from dotenv import load_dotenv
-from app.bot_handlers import start, interrompi_piano, handle_text, mostra_piano, cancella_piano, ultima_uscita, uscite_settimanali
+from app.bot_handlers import start, interrompi_piano, handle_text, mostra_piano, cancella_piano, ultima_uscita, uscite_settimanali, invia_testo_lungo
+from app.models import formatta_piano
 import app.database as db
 import app.strava_client as strava
 import app.gemini_coach as coach
@@ -36,6 +37,8 @@ async def lifespan(app: FastAPI):
     await bot_app.start()
     await bot_app.updater.start_polling()
     print("✅ Bot Telegram avviato in modalità polling.")
+    # Debug: mostra quale bot è associato al token caricato
+    print(f"🤖 Bot in uso: @{bot_app.bot.username}")
     scheduler = AsyncIOScheduler()
     scheduler.add_job(
         routine_settimanale_piani, # Assicurati che questa funzione sia definita sopra!
@@ -110,68 +113,52 @@ async def strava_webhook(request: Request):
     return {"status": "ok"}
 
 
-async def routine_settimanale_piani():
+async def routine_settimanale_piani() -> None:
+    """Invia ogni lunedì il piano della settimana a tutti gli utenti attivi.
+
+    Per ogni utente con stato ``ACTIVE``:
+
+    - piano non ancora iniziato: nessun invio;
+    - settimana 1: invia gli allenamenti già generati all'onboarding;
+    - dalla settimana 2: chiede a Gemini l'aggiornamento della settimana in
+      base alle uscite fatte, lo salva nel database e lo invia con il feedback.
+
+    Un errore su un utente viene registrato nei log e non blocca gli altri.
+    """
     print("🌅 Inizio generazione automatica dei piani settimanali...")
-    
-    # 1. Recupera tutti gli utenti dal database MongoDB
-    utenti = db._load_db()
-    for chat_id, dati_utente in utenti.items():
-        # Opzionale: controlla se l'utente ha finito l'onboarding ed è attivo
-        if dati_utente.get("stato") == "ACTIVE":
-            print(f"Aggiornamento piano per l'utente {chat_id}...")
-            
-            try:
-                data_inizio = datetime.strptime(dati_utente["profilo"]["data inizio piano"],"%d/%m/%Y")
-                oggi = datetime.now()
-                delta = data_inizio - oggi
-                week = int(delta.days/7) +1
-                if week == 1:
-                    utente = db.get_user(chat_id)
-                    print(f" Richiesta piano")
-                    if utente.get("stato") == "ACTIVE" and "piano_corrente" in utente.get("profilo", {}):
-                        messaggio = utente["profilo"]["piano_corrente"]
-                        messaggio_completo = f"Sei alla prima settimana! Ecco il tuo piano:\n\n{messaggio}"
-                else:    
-                    messaggio = coach.aggiorna_piano(dati_utente)
-                    
-                    
-                        
-                    piano_generato = f"""
-                    {dati_utente["profilo"]["piano_corrente"]}
-                    \n\n\n Questo il feedback della {week -1} e il programma aggiornato della {week}\n\n\n
-                    {messaggio}
-                    """
-                    
-                    db.update_user_profile(chat_id, "piano_corrente", piano_generato)
-                # invio il messaggio su telegram
-                    messaggio_completo = f"Ecco l'aggiornamento del tuo piano:\n\n{messaggio}"
-                MAX_LEN = 4000
-        
-                while len(messaggio_completo) > 0:
-                    if len(messaggio_completo) <= MAX_LEN:
-                        await bot_app.bot.send_message(chat_id=chat_id, text=messaggio_completo)
-                        break
-                        
-                    # Cerca l'ultimo "a capo" entro il limite di 4000 caratteri
-                    punto_taglio = messaggio_completo.rfind('\n', 0, MAX_LEN)
-                    
-                    # Se non trova un "a capo", cerca l'ultimo spazio bianco
-                    if punto_taglio == -1:
-                        punto_taglio = messaggio_completo.rfind(' ', 0, MAX_LEN)
-                        
-                    # Se non trova nemmeno uno spazio (improbabile), forza il taglio al limite
-                    if punto_taglio == -1:
-                        punto_taglio = MAX_LEN
-                        
-                    # Invia il blocco pulito
-                    await bot_app.bot.send_message(chat_id=chat_id,text=messaggio_completo[:punto_taglio])
-                    
-                    # Rimuove la parte inviata dalla stringa totale e toglie eventuali spazi vuoti all'inizio
-                    messaggio_completo = messaggio_completo[punto_taglio:].lstrip()
-              
-                print(f"✅ Piano inviato con successo a {chat_id}")
-                
-                # Pausa di 2 secondi tra un utente e l'altro per non floodare le API di Telegram/Gemini
-                await asyncio.sleep(2)  
-            except Exception as e:
-                print(f"❌ Errore con l'utente {chat_id}: {e}")
+
+    for chat_id, dati_utente in db._load_db().items():
+        if dati_utente.get("stato") != "ACTIVE":
+            continue
+        print(f"Aggiornamento piano per l'utente {chat_id}...")
+
+        try:
+            settimana = coach.calcola_settimana_piano(dati_utente["profilo"]["data inizio piano"])
+
+            if settimana < 1:
+                print(f"ℹ️ Il piano di {chat_id} non è ancora iniziato.")
+                continue
+
+            if settimana == 1:
+                # La prima settimana è già stata generata durante l'onboarding
+                testo = f"Sei alla prima settimana! Ecco il tuo piano:\n\n{formatta_piano(db.get_plan(chat_id))}"
+            else:
+                aggiornamento = coach.aggiorna_piano(dati_utente, settimana)
+                if aggiornamento is None:
+                    print(f"❌ Aggiornamento del piano non riuscito per {chat_id}.")
+                    continue
+
+                db.save_plan(chat_id, [a.model_dump() for a in aggiornamento.allenamenti])
+                testo = (
+                    f"Feedback della settimana {settimana - 1}:\n{aggiornamento.commento}\n\n"
+                    f"Ecco il piano della settimana {settimana}:\n\n"
+                    f"{formatta_piano(aggiornamento.allenamenti)}"
+                )
+
+            await invia_testo_lungo(bot_app.bot, chat_id, testo)
+            print(f"✅ Piano inviato con successo a {chat_id}")
+
+            # Pausa tra un utente e l'altro per non saturare le API di Telegram/Gemini
+            await asyncio.sleep(2)
+        except Exception as e:
+            print(f"❌ Errore con l'utente {chat_id}: {e}")

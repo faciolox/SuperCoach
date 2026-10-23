@@ -7,6 +7,41 @@ from app.gemini_coach import analizza_uscita
 from app.gemini_coach import analizza_uscite_settimanali
 from datetime import datetime, date
 
+from telegram import Bot
+
+from app.models import FORMATO_DATA, formatta_piano
+
+#: Lunghezza massima di un messaggio Telegram (il limite reale è 4096 caratteri).
+MAX_LEN_MESSAGGIO = 4000
+
+
+async def invia_testo_lungo(bot: Bot, chat_id, testo: str) -> None:
+    """Invia un testo su Telegram dividendolo in più messaggi se troppo lungo.
+
+    Il taglio avviene sull'ultimo "a capo" (o spazio) entro il limite, per
+    non spezzare righe o parole a metà.
+
+    Args:
+        bot (Bot): Istanza del bot Telegram.
+        chat_id (int | str): Chat a cui inviare il testo.
+        testo (str): Testo da inviare.
+    """
+    while testo:
+        if len(testo) <= MAX_LEN_MESSAGGIO:
+            await bot.send_message(chat_id=chat_id, text=testo)
+            return
+
+        punto_taglio = testo.rfind("\n", 0, MAX_LEN_MESSAGGIO)
+        if punto_taglio == -1:
+            punto_taglio = testo.rfind(" ", 0, MAX_LEN_MESSAGGIO)
+        if punto_taglio == -1:
+            # Nessuno spazio disponibile: taglio forzato al limite
+            punto_taglio = MAX_LEN_MESSAGGIO
+
+        await bot.send_message(chat_id=chat_id, text=testo[:punto_taglio])
+        testo = testo[punto_taglio:].lstrip()
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Inizializza l'utente e avvia il processo di onboarding."""
     chat_id = update.effective_chat.id
@@ -30,42 +65,28 @@ async def interrompi_piano(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Quando vuoi ricominciare, usa il comando /start."
     )
 
-async def mostra_piano(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra il piano attualmente salvato in memoria."""
+async def mostra_piano(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Mostra il piano di allenamento salvato nel database.
+
+    Args:
+        update (Update): Aggiornamento Telegram con il comando /piano.
+        context (ContextTypes.DEFAULT_TYPE): Contesto del bot.
+    """
+    print("Richiesta piano")
+    chat_id = update.effective_chat.id
     try:
-        chat_id = update.effective_chat.id
-        utente = db.get_user(chat_id)
-        print(f" Richiesta piano")
-        if utente.get("stato") == "ACTIVE" and "piano_corrente" in utente.get("profilo", {}):
-            messaggio_completo = utente["profilo"]["piano_corrente"]
-            
-            MAX_LEN = 4000
-            
-            while len(messaggio_completo) > 0:
-                if len(messaggio_completo) <= MAX_LEN:
-                    await update.message.reply_text(messaggio_completo)
-                    break
-                    
-                # Cerca l'ultimo "a capo" entro il limite di 4000 caratteri
-                punto_taglio = messaggio_completo.rfind('\n', 0, MAX_LEN)
-                
-                # Se non trova un "a capo", cerca l'ultimo spazio bianco
-                if punto_taglio == -1:
-                    punto_taglio = messaggio_completo.rfind(' ', 0, MAX_LEN)
-                    
-                # Se non trova nemmeno uno spazio (improbabile), forza il taglio al limite
-                if punto_taglio == -1:
-                    punto_taglio = MAX_LEN
-                    
-                # Invia il blocco pulito
-                await update.message.reply_text(messaggio_completo[:punto_taglio])
-                
-                # Rimuove la parte inviata dalla stringa totale e toglie eventuali spazi vuoti all'inizio
-                messaggio_completo = messaggio_completo[punto_taglio:].lstrip()
-        else:
-            await update.message.reply_text("Non hai nessun piano attivo al momento. Usa /start per crearne uno nuovo.")
+        piano = db.get_plan(chat_id)
+        if not piano:
+            await update.message.reply_text(
+                "Non hai nessun piano attivo al momento. Usa /start per crearne uno nuovo."
+            )
+            return
+        await invia_testo_lungo(context.bot, chat_id, formatta_piano(piano))
     except Exception as e:
-        print(f" Errore {e}")
+        print(f"❌ Errore nella visualizzazione del piano per {chat_id}: {e}")
+        await update.message.reply_text("❌ Non sono riuscito a recuperare il tuo piano, riprova tra poco.")
+
+
 async def cancella_piano(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Cancella il piano e disattiva il bot per l'utente."""
     try:
@@ -74,6 +95,7 @@ async def cancella_piano(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         db.update_user_state(chat_id, "PAUSED", step=None)
         db.update_user_profile(chat_id, "piano_corrente", None)
+        db.delete_plan(chat_id)
         
         await update.message.reply_text(
             "🗑️ Il tuo piano di allenamento è stato cancellato definitivamente. L'analisi automatica di Strava è disattivata.\n\n"
@@ -192,47 +214,39 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif step == 3:
             db.update_user_profile(chat_id, "zone_hr", testo)
             db.update_user_state(chat_id, "ONBOARDING", step=4)
-            await update.message.reply_text("4️⃣ Quali e' la tua FTP? Se non la conosci scrivi sconosciuta")
+            await update.message.reply_text("5️⃣ Qual è la tua FTP? Se non la conosci scrivi sconosciuta")
         elif step == 4:
             db.update_user_profile(chat_id,"ftp", testo)
             db.update_user_state(chat_id, "ONBOARDING", step=5)
-            await update.message.reply_text("Quando vuoi iniziare il piano?")
+            await update.message.reply_text("6️⃣ Quando vuoi iniziare il piano? Scrivi la data nel formato gg/mm/aaaa (es. 03/11/2026)")
         elif step == 5:
-            db.update_user_profile(chat_id,"data inizio piano", testo)
-            db.update_user_state(chat_id, "ACTIVE", step=None)   
-            await update.message.reply_text("Perfetto! Sto elaborando il tuo profilo e generando il piano di allenamento con Gemini. Un attimo di pazienza... 🚴‍♂️")
-            
-            utente_aggiornato = db.get_user(chat_id)
-            profilo = utente_aggiornato["profilo"]
-            
-            piano_generato = genera_piano_allenamento(profilo)
-            
-            # Salva il piano nel database
-            db.update_user_profile(chat_id, "piano_corrente", piano_generato)
-            messaggio_completo = f"Ecco il tuo piano strutturato:\n\n{piano_generato}"
-            MAX_LEN = 4000
+            # La data viene usata per calcolare la settimana del piano: va validata subito
+            try:
+                datetime.strptime(testo.strip(), FORMATO_DATA)
+            except ValueError:
+                await update.message.reply_text("⚠️ Data non valida. Scrivila nel formato gg/mm/aaaa (es. 03/11/2026).")
+                return
 
-            while len(messaggio_completo) > 0:
-                if len(messaggio_completo) <= MAX_LEN:
-                    await update.message.reply_text(messaggio_completo)
-                    break
-                    
-                # Cerca l'ultimo "a capo" entro il limite di 4000 caratteri
-                punto_taglio = messaggio_completo.rfind('\n', 0, MAX_LEN)
-                
-                # Se non trova un "a capo", cerca l'ultimo spazio bianco
-                if punto_taglio == -1:
-                    punto_taglio = messaggio_completo.rfind(' ', 0, MAX_LEN)
-                    
-                # Se non trova nemmeno uno spazio (improbabile), forza il taglio al limite
-                if punto_taglio == -1:
-                    punto_taglio = MAX_LEN
-                    
-                # Invia il blocco pulito
-                await update.message.reply_text(messaggio_completo[:punto_taglio])
-                
-                # Rimuove la parte inviata dalla stringa totale e toglie eventuali spazi vuoti all'inizio
-                messaggio_completo = messaggio_completo[punto_taglio:].lstrip()
+            db.update_user_profile(chat_id, "data inizio piano", testo.strip())
+            await update.message.reply_text(
+                "Perfetto! Sto elaborando il tuo profilo e generando il piano di allenamento con Gemini. "
+                "Un attimo di pazienza... 🚴‍♂️"
+            )
+
+            profilo = db.get_user(chat_id)["profilo"]
+            piano = genera_piano_allenamento(profilo)
+            if piano is None:
+                # L'utente resta allo step 5: rimandando la data si riprova la generazione
+                await update.message.reply_text(
+                    "❌ Non sono riuscito a generare il piano. Rimandami la data di inizio per riprovare."
+                )
+                return
+
+            db.save_plan(chat_id, [a.model_dump() for a in piano.allenamenti])
+            db.update_user_state(chat_id, "ACTIVE", step=None)
+
+            testo_piano = f"{piano.commento}\n\nEcco il tuo piano strutturato:\n\n{formatta_piano(piano.allenamenti)}"
+            await invia_testo_lungo(context.bot, chat_id, testo_piano)
             await update.message.reply_text(
                 "Da questo momento, ogni volta che salverai un'attività su Strava, "
                 "la analizzerò automaticamente e ti manderò il resoconto qui.\n\n"

@@ -1,10 +1,13 @@
 import os
 from pymongo import MongoClient
-
+import re
+from datetime import datetime
+from app.models import FORMATO_DATA
 # Connessione al database
 mongo_uri = os.getenv("MONGO_URI")
 activity_name = os.getenv("ACTIVITY_DB")
 users_name = os.getenv("USERS_DB")
+plans_name = os.getenv("PLANS_DB")
 if not mongo_uri:
     print("⚠️ Attenzione: Variabile MONGO_URI mancante!")
 
@@ -12,6 +15,7 @@ client = MongoClient(mongo_uri)
 db_client = client["supercoach_db"]
 users_collection = db_client[users_name]
 activities = db_client[activity_name]
+plans_collection = db_client[plans_name]
 # --- FUNZIONI DI GESTIONE UTENTI ---
 
 def get_user(chat_id):
@@ -98,4 +102,78 @@ def get_activity_set(chat_id: str, min:int=0, max:int =5) -> list:
     
     return activities_out
 
-    
+# --- FUNZIONI GESTIONE PIANI ---
+def _data_allenamento(allenamento: dict) -> datetime:
+    """Restituisce la data di un allenamento salvato, usata per ordinare il piano.
+ 
+    Args:
+        allenamento (dict): Allenamento nel formato di ``Allenamento.model_dump()``.
+ 
+    Returns:
+        datetime: Data dell'allenamento.
+    """
+    return datetime.strptime(allenamento["data"], FORMATO_DATA)
+ 
+ 
+def save_plan(chat_id, nuovi_allenamenti: list[dict]) -> list[dict]:
+    """Salva gli allenamenti di un utente, unendoli al piano già presente.
+ 
+    Gli allenamenti esistenti *precedenti* alla prima data dei nuovi vengono
+    mantenuti (storico); quelli dalla prima nuova data in poi vengono
+    sostituiti, così un aggiornamento settimanale rimpiazza solo le
+    settimane che ricalcola. Al termine gli ID vengono rinumerati da 1 in
+    ordine cronologico.
+ 
+    I documenti salvati nel vecchio formato testuale (senza il campo
+    ``data``) vengono scartati.
+ 
+    Args:
+        chat_id (str | int): Chat ID dell'utente.
+        nuovi_allenamenti (list[dict]): Allenamenti validati, nel formato
+            di ``Allenamento.model_dump()``.
+ 
+    Returns:
+        list[dict]: Piano completo salvato, in ordine cronologico.
+    """
+    if not nuovi_allenamenti:
+        return get_plan(chat_id)
+ 
+    inizio_nuovi = min(_data_allenamento(a) for a in nuovi_allenamenti)
+    storico = [
+        a for a in get_plan(chat_id)
+        if "data" in a and _data_allenamento(a) < inizio_nuovi
+    ]
+ 
+    piano = sorted(storico + list(nuovi_allenamenti), key=_data_allenamento)
+    for numero, allenamento in enumerate(piano, start=1):
+        allenamento["id"] = numero
+ 
+    plans_collection.update_one(
+        {"chat_id": str(chat_id)},
+        {"$set": {"workouts": piano}},
+        upsert=True,
+    )
+    return piano
+ 
+ 
+def get_plan(chat_id) -> list[dict]:
+    """Restituisce gli allenamenti pianificati per un utente.
+ 
+    Args:
+        chat_id (str | int): Chat ID dell'utente.
+ 
+    Returns:
+        list[dict]: Allenamenti salvati, oppure lista vuota se l'utente
+            non ha ancora un piano.
+    """
+    plan = plans_collection.find_one({"chat_id": str(chat_id)})
+    return plan.get("workouts", []) if plan else []
+ 
+ 
+def delete_plan(chat_id) -> None:
+    """Elimina il piano di allenamento di un utente.
+ 
+    Args:
+        chat_id (str | int): Chat ID dell'utente.
+    """
+    plans_collection.delete_one({"chat_id": str(chat_id)})
