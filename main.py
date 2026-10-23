@@ -98,7 +98,11 @@ async def strava_webhook(request: Request):
             # Analizza con Gemini
                 uscita = db.get_activity(chat_id, dati_strava["strava_id"])
                 if not uscita and data.get("stato") == "ACTIVE":
-                    analisi_testo = coach.analizza_uscita(dati_strava)
+                    analisi_testo = coach.analizza_uscita(
+                        dati_strava,
+                        profilo=data.get("profilo", {}),
+                        allenamento_previsto=db.get_workout_by_date(chat_id, dati_strava["data"]),
+                    )
                     db.save_activity(chat_id,activity_id,'',analisi_testo)
                     messaggio_finale = f"🚴‍♂️ **Nuova attività rilevata!**\n\n{analisi_testo}"
                     

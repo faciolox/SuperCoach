@@ -177,3 +177,16 @@ def delete_plan(chat_id) -> None:
         chat_id (str | int): Chat ID dell'utente.
     """
     plans_collection.delete_one({"chat_id": str(chat_id)})
+    
+def get_workout_by_date(chat_id, data: str) -> dict | None:
+    """Restituisce l'allenamento pianificato per una data specifica.
+
+    Args:
+        chat_id (str | int): Chat ID dell'utente.
+        data (str): Data nel formato "gg/mm/aaaa".
+
+    Returns:
+        dict | None: Allenamento previsto, oppure None se quel giorno non
+            c'è nulla in programma.
+    """
+    return next((a for a in get_plan(chat_id) if a.get("data") == data), None)

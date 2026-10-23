@@ -1,5 +1,5 @@
 import json
-import os
+import os, re
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from pydantic import ValidationError
 import app.database as db
 import app.strava_client as strava
-from app.models import FORMATO_DATA, PianoAllenamento
+from app.models import FORMATO_DATA, PianoAllenamento, Allenamento, formatta_allenamento
 # Carica le variabili d'ambiente (inclusa GEMINI_API_KEY)
 load_dotenv()
 
@@ -37,7 +37,7 @@ Sei un preparatore atletico d'élite specializzato nel ciclismo su strada e data
 
 Non fare tabelle o elementi grafici, perché i messaggi vengono inviati su Telegram.
 Regole per i feedback e i piani:
-1. Analizza sempre il tempo speso nelle diverse zone (Z1-Z5).
+1. Analizza sempre il tempo speso nelle diverse zone.
 2. Verifica se i segmenti hanno richiesto sforzi fuori soglia e come questo impatta il recupero.
 3. Se noti deriva cardiaca (es. battiti alti a parità di sforzo prolungato), fallo notare.
 4. Usa un tono professionale, diretto e motivante, adatto a un messaggio testuale (es. Telegram). Niente poemi, vai dritto al punto tecnico.
@@ -211,57 +211,135 @@ def analizza_uscite_settimanali(dati_strava_puliti:dict):
             
             # Salviamo un messaggio discorsivo che Telegram può effettivamente inviare senza crashare
             response = "Mi dispiace, si è verificato un errore durante l'elaborazione dei tuoi dati. Riprova tra poco."
+
+def _ftp_da_profilo(profilo: dict) -> float | None:
+    """Estrae l'FTP numerica dal profilo, salvata come testo libero all'onboarding.
+
+    Args:
+        profilo (dict): Profilo dell'atleta.
+
+    Returns:
+        float | None: FTP in watt, oppure None se assente o "sconosciuta".
+    """
+    trovato = re.search(r"\d+", str(profilo.get("ftp", "")))
+    return float(trovato.group()) if trovato else None
+
+def _calcola_carico(dati: dict, ftp: float | None) -> str:
+    """Calcola Intensity Factor e TSS dalla potenza normalizzata.
+
+    Formule standard: IF = NP / FTP; TSS = durata_h × IF² × 100.
+
+    Args:
+        dati (dict): Dati puliti dell'uscita (servono NP e tempo in movimento).
+        ftp (float | None): FTP dell'atleta in watt.
+
+    Returns:
+        str: Riga descrittiva con IF e TSS, oppure il motivo per cui
+            non sono calcolabili.
+    """
+    np_watt = dati.get("potenza_normalizzata_w")
+    if not np_watt or not ftp:
+        return "IF/TSS non calcolabili (manca la potenza reale o l'FTP)."
+
+    intensity_factor = np_watt / ftp
+    durata_ore = dati.get("tempo_movimento_minuti", 0) / 60
+    tss = durata_ore * intensity_factor ** 2 * 100
+    return f"IF {intensity_factor:.2f} | TSS {tss:.0f}"
 # 4. CRITICO DELLE PRESTAZIONI POST-ALLENAMENTO
-def analizza_uscita(dati_strava_puliti: dict):
+def analizza_uscita(
+    dati_strava_puliti: dict,
+    profilo: dict | None = None,
+    allenamento_previsto: dict | None = None,
+) -> str | None:
+    """Genera l'analisi tecnica di un'uscita, confrontandola con il piano.
+
+    Args:
+        dati_strava_puliti (dict): Dati prodotti da format_strava_data_for_gemini.
+        profilo (dict | None, optional): Profilo dell'atleta (obiettivo, FTP,
+            zone HR). Defaults to None.
+        allenamento_previsto (dict | None, optional): Allenamento pianificato
+            per il giorno dell'uscita. Defaults to None.
+
+    Returns:
+        str | None: Testo dell'analisi pronto per Telegram, oppure None se
+            Gemini non risponde.
     """
-    Prende il dizionario formattato da strava_client.py e restituisce l'analisi tecnica.
-    """
-    prompt = f"""
-    L'atleta ha appena salvato una nuova uscita su Strava il {dati_strava_puliti.get("Start time")}. Analizza i seguenti dati:
-    
-    - Titolo attività: {dati_strava_puliti.get('titolo')}
-    - Distanza: {dati_strava_puliti.get('distanza_km')} km
-    - Dislivello: {dati_strava_puliti.get('dislivello_m')} m
-    - Tempo in movimento: {dati_strava_puliti.get('tempo_movimento_minuti')} minuti
-    - Frequenza Cardiaca: Media {dati_strava_puliti.get('fc_media')} bpm | Max {dati_strava_puliti.get('fc_max')} bpm
-    - Sforzo Relativo (Strava): {dati_strava_puliti.get('sforzo_relativo')}
-    
-    Distribuzione Zone Cardio:
-    {dati_strava_puliti.get('tempo_in_zone_cardio')}
-    
-    Distribuzione Zone Potenza:
-    {dati_strava_puliti.get('tempo_in_zone_potenza')}
-    
-    Segmenti rilevanti affrontati:
-    {dati_strava_puliti.get('segmenti_rilevanti')}
-    
-    Fornisci un commento tecnico sull'esecuzione di questa uscita, valutando il carico interno 
-    (cuore) ed esterno (potenza/dislivello). Dimmi come questa uscita impatterà il recupero dei prossimi giorni.
-    """
-    try: 
-        now = datetime.now()
-        print(f"🕒 {now.strftime("%d/%m/%Y, %H:%M:%S")}: Richiesta API inviata a Gemini. Prompt:\n{prompt}")
-        response = client.models.generate_content(
-            model='gemini-flash-latest',
-            contents=prompt,
-            config=config_base
+    profilo = profilo or {}
+    dati = dati_strava_puliti
+    ftp = _ftp_da_profilo(profilo)
+
+    if allenamento_previsto:
+        previsto = formatta_allenamento(Allenamento.model_validate(allenamento_previsto))
+    else:
+        previsto = "Nessun allenamento previsto per oggi (uscita fuori piano)."
+
+    if dati.get("potenza_normalizzata_w"):
+        potenza = (
+            f"Media {dati.get('potenza_media_w')} W | Normalizzata {dati.get('potenza_normalizzata_w')} W | "
+            f"Max {dati.get('potenza_max_w')} W | {_calcola_carico(dati, ftp)}"
         )
-        now2 = datetime.now()
-        time_delta = (now2-now).total_seconds()
-        print(f"✅ {now2.strftime('%d/%m/%Y, %H:%M:%S')}: Risposta elaborata con successo in {time_delta:.2f}.")
-        if response.usage_metadata:
-            token_in = response.usage_metadata.prompt_token_count
-            token_out = response.usage_metadata.candidates_token_count
-            token_totali = response.usage_metadata.total_token_count
-            print(f"📊 Consumo Token: {token_in} (input) + {token_out} (output) = {token_totali} totali", flush=True)
-        return response.text
+    else:
+        potenza = "Nessun misuratore di potenza: valuta solo frequenza cardiaca e dislivello."
+
+    prompt = f"""
+    CONTESTO ATLETA
+    - Obiettivo: {profilo.get('obiettivo', 'Non specificato')}
+    - FTP: {f'{ftp:.0f} W' if ftp else 'non disponibile'}
+    - Zone cardio: {profilo.get('zone_hr', 'Non specificate')}
+
+    ALLENAMENTO PREVISTO
+    {previsto}
+
+    USCITA SVOLTA ({dati.get('data')}, {'rulli/indoor' if dati.get('indoor') else 'outdoor'})
+    - Titolo: {dati.get('titolo')}
+    - Distanza: {dati.get('distanza_km')} km | Dislivello: {dati.get('dislivello_m')} m
+    - Tempo in movimento: {dati.get('tempo_movimento_minuti')} min (totale {dati.get('tempo_totale_minuti')} min)
+    - Frequenza cardiaca: media {dati.get('fc_media')} bpm | max {dati.get('fc_max')} bpm
+    - Cadenza media: {dati.get('cadenza_media') or 'n/d'} rpm
+    - Potenza: {potenza}
+    - Sforzo relativo Strava: {dati.get('sforzo_relativo')}
+    - Tempo in zone cardio: {dati.get('tempo_in_zone_cardio')}
+    - Tempo in zone potenza: {dati.get('tempo_in_zone_potenza')}
+    - Segmenti: {dati.get('segmenti_rilevanti') or 'nessuno'}
+
+    ISTRUZIONI
+    Analizza l'uscita come un coach che scrive all'atleta su Telegram. Rispondi in
+    testo semplice, senza Markdown né asterischi, al massimo 1200 caratteri,
+    usando esattamente queste sezioni:
+
+    🎯 Verdetto: una frase. Se c'era un allenamento previsto, di' se è stato
+    rispettato, superato o non raggiunto (intensità, durata, zone).
+    📊 Carico esterno: potenza, IF/TSS e dislivello. Usa i valori forniti, non ricalcolarli.
+    ❤️ Carico interno: distribuzione nelle zone cardio e coerenza tra cuore e potenza.
+    ⛰️ Segmenti: solo se rilevanti, massimo due, con il motivo.
+    🔋 Recupero: impatto sui prossimi giorni e un consiglio concreto per la prossima sessione.
+
+    Regole:
+    - Basati solo sui dati forniti: se un dato manca, non stimarlo e non citarlo.
+    - Non parlare di deriva cardiaca: senza l'andamento della frequenza nel tempo non è valutabile.
+    - Sii specifico con i numeri e diretto nei giudizi.
+    """
+
+    try:
+        inizio = datetime.now()
+        print(f"🕒 {inizio.strftime('%d/%m/%Y, %H:%M:%S')}: Richiesta analisi inviata a Gemini. Prompt:\n{prompt}")
+        risposta = client.models.generate_content(
+            model="gemini-flash-latest",
+            contents=prompt,
+            config=config_base,
+        )
+        durata = (datetime.now() - inizio).total_seconds()
+        print(f"✅ Analisi ricevuta in {durata:.2f} secondi.")
+        if risposta.usage_metadata:
+            uso = risposta.usage_metadata
+            print(f"📊 Consumo Token: {uso.prompt_token_count} (input) + "
+                  f"{uso.candidates_token_count} (output) = {uso.total_token_count} totali", flush=True)
+        return risposta.text
     except Exception as e:
-            # Registriamo l'errore tecnico nel log di Render per fare debug
-            print(f"❌ {datetime.now().strftime('%d/%m/%Y, %H:%M:%S')} - ERRORE API GEMINI: {e}")
-            
-            # Salviamo un messaggio discorsivo che Telegram può effettivamente inviare senza crashare
-            response = "Mi dispiace, si è verificato un errore durante l'elaborazione dei tuoi dati. Riprova tra poco."
-            
+        print(f"❌ {datetime.now().strftime('%d/%m/%Y, %H:%M:%S')} - ERRORE API GEMINI: {e}")
+        return None      
+
+
 def aggiorna_piano(utente: dict, settimana: int) -> PianoAllenamento | None:
     """Ricalcola gli allenamenti della settimana corrente in base alle uscite fatte.
 

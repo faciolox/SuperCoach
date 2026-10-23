@@ -128,6 +128,7 @@ def format_strava_data_for_gemini(activity_id: int):
         "strava_id": activity_id,
         "Start time": start.strftime("%d-%m-%Y"), 
         "titolo": details.get("name"),
+        "cadenza_media": details.get("average_cadence"),
         "distanza_km": round(details.get("distance", 0) / 1000, 2),
         "dislivello_m": details.get("total_elevation_gain"),
         "tempo_movimento_minuti": round(details.get("moving_time", 0) / 60, 1),

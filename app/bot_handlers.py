@@ -175,7 +175,11 @@ async def ultima_uscita(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if dati_strava:
             # 3. Passa i dati a Gemini
-            analisi = analizza_uscita(dati_strava)
+            analisi = analizza_uscita(
+                dati_strava,
+                profilo=utente.get("profilo", {}),
+                allenamento_previsto=db.get_workout_by_date(chat_id, dati_strava["data"]),
+            )
             db.save_activity(chat_id,activity_id,'',analisi)
             await update.message.reply_text(f"🚴‍♂️ **Report Ultima Uscita:**\n\n{analisi}")
         else:
