@@ -53,19 +53,19 @@ def calcola_zone_potenza_reali(watt_array):
     zone = {"Z1": 0, "Z2": 0, "Z3": 0, "Z4": 0, "Z5": 0,"Z6": 0,"Z7": 0}
     
     for watt in watt_array:
-        if watt < 114:
+        if watt <= 114:
             zone["Z1"] += 1
-        elif 115 <= watt <= 155:
+        elif 114 < watt <= 155:
             zone["Z2"] += 1
-        elif 156 <= watt <= 186:
+        elif 155 < watt <= 186:
             zone["Z3"] += 1
-        elif 187 <= watt <= 217:
+        elif 186 <= watt <= 217:
             zone["Z4"] += 1
-        elif 248 <= watt >= 218:
+        elif 217 < watt >= 249:
             zone["Z5"] += 1
-        elif 249 > watt < 249:
+        elif 249 > watt <= 311:
             zone["Z6"] += 1
-        else:
+        elif watt > 311:
             zone["Z7"] += 1
             
     # Converte i secondi in minuti per una lettura più facile
@@ -201,8 +201,9 @@ def get_last_week_activities():
     dom = today - timedelta(days=today.weekday()+1)
     lun = dom - timedelta(days=6)
     token = get_access_token() 
+    number_activites = 7  
     while True:  
-        number_activites = 7   
+         
         url = f"https://www.strava.com/api/v3/athlete/activities?per_page={number_activites}"
         headers = {"Authorization": f"Bearer {token}"}
         try:
@@ -226,52 +227,6 @@ def get_last_week_activities():
     attività_settimanali = []
     for activity in activities:
         dati_puliti = format_strava_data_for_gemini(activity["id"])
-        """zones = get_activity_zones(activity["id"])
-        dati_puliti = {
-                "titolo": activity.get("name"),
-                "data": activity.get("start_date_local")[:10],
-                "distanza_km": round(activity.get("distance", 0) / 1000, 2),
-                "dislivello_m": activity.get("total_elevation_gain"),
-                "tempo_movimento_minuti": round(activity.get("moving_time", 0) / 60, 1),
-                "fc_media": activity.get("average_heartrate"),
-                "fc_max": activity.get("max_heartrate"),
-                "sforzo_relativo": activity.get("suffer_score", "Non disponibile"),
-                "tempo_in_zone_cardio": [],
-                "tempo_in_zone_potenza": [],
-                "segmenti_rilevanti": []
-            }
-        for i, bucket in enumerate(zones.get("heartrate", [])):
-            minuti = round(bucket.get("time", 0) / 60, 1)
-            dati_puliti["tempo_in_zone_cardio"].append(f"Z{i+1}: {minuti} min")
-        if activity.get("device_watts") is True:
-            dati_puliti["potenza_media_w"] = activity.get("average_watts")
-            dati_puliti["potenza_max_w"] = activity.get("max_watts")
-            dati_puliti["potenza_normalizzata_w"] = activity.get("weighted_average_watts")
-            
-            for i, bucket in enumerate(zones.get("power", [])):
-                minuti = round(bucket.get("time", 0) / 60, 1)
-                dati_puliti["tempo_in_zone_potenza"].append(f"Z{i+1} (Power): {minuti} min")
-        else:
-            dati_puliti["tempo_in_zone_potenza"] = "Nessun misuratore di potenza rilevato (dati stimati ignorati)."
-        
-        # --- GESTIONE SEGMENTI ---
-        segment_efforts = activity.get("segment_efforts", [])
-        for effort in segment_efforts:
-            nome_segmento = effort.get("name")
-            tempo_secondi = effort.get("elapsed_time", 0)
-            
-            # Converte i secondi in un formato leggibile (es. "5m 30s")
-            minuti, secondi = divmod(tempo_secondi, 60)
-            tempo_formattato = f"{minuti}m {secondi}s"
-            
-            # Aggiungiamo un'icona se c'è un PR (Personal Record)
-            pr_flag = ""
-            for achievement in effort.get("achievements", []):
-                if achievement.get("type_id") in [2, 3]: # 2 = PR, 3 = Top 10
-                    pr_flag = " 🏆 (PR!)"
-                    break
-                    
-            dati_puliti["segmenti_rilevanti"].append(f"{nome_segmento}: {tempo_formattato}{pr_flag}")"""
         attività_settimanali.append(dati_puliti)
     return attività_settimanali
 def get_this_week_activities():

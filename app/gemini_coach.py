@@ -98,7 +98,7 @@ def _genera_piano_strutturato(prompt: str) -> PianoAllenamento | None:
         inizio = datetime.now()
         print(f"🕒 {inizio.strftime('%d/%m/%Y, %H:%M:%S')}: Richiesta piano inviata a Gemini. Prompt:\n{prompt}")
         risposta = client.models.generate_content(
-            model="gemini-flash-latest",
+            model="gemini-pro-latest",
             contents=prompt,
             config=config_piano,
         )
