@@ -2,7 +2,7 @@ import os
 import requests
 from dotenv import load_dotenv
 from datetime import datetime,timedelta
-import json
+import json,time
 # Carica le variabili d'ambiente
 load_dotenv()
 
@@ -53,19 +53,19 @@ def calcola_zone_potenza_reali(watt_array):
     zone = {"Z1": 0, "Z2": 0, "Z3": 0, "Z4": 0, "Z5": 0,"Z6": 0,"Z7": 0}
     
     for watt in watt_array:
-        if watt < 114:
+        if watt <= 114:
             zone["Z1"] += 1
-        elif 115 <= watt <= 155:
+        elif 114 < watt <= 156:
             zone["Z2"] += 1
-        elif 156 <= watt <= 186:
+        elif 156 < watt <= 186:
             zone["Z3"] += 1
-        elif 187 <= watt <= 217:
+        elif 186 < watt <= 217:
             zone["Z4"] += 1
-        elif 248 <= watt >= 218:
+        elif 249 >= watt > 217:
             zone["Z5"] += 1
-        elif 249 > watt < 249:
+        elif 249 > watt <= 311:
             zone["Z6"] += 1
-        else:
+        elif watt > 311:
             zone["Z7"] += 1
             
     # Converte i secondi in minuti per una lettura più facile
@@ -185,13 +185,18 @@ def get_latest_activity_id():
     
     url = "https://www.strava.com/api/v3/athlete/activities?per_page=1"
     headers = {"Authorization": f"Bearer {token}"}
-    
-    response = requests.get(url, headers=headers)
-    
-    if response.status_code == 200:
-        activities = response.json()
-        if activities:
-            return activities[0]["id"]
+    retry = 0
+    while retry < 5:
+        try:
+            response = requests.get(url, headers=headers)
+            
+            if response.status_code == 200:
+                activities = response.json()
+                if activities:
+                    return activities[0]["id"]
+        except:
+            retry += 1
+            time.sleep(20)
             
     print(f"Errore nel recupero attività: {response.text}")
     return None
@@ -203,8 +208,9 @@ def get_last_week_activities():
     dom = today - timedelta(days=today.weekday()+1)
     lun = dom - timedelta(days=6)
     token = get_access_token() 
+    number_activites = 7  
     while True:  
-        number_activites = 7   
+         
         url = f"https://www.strava.com/api/v3/athlete/activities?per_page={number_activites}"
         headers = {"Authorization": f"Bearer {token}"}
         try:

@@ -89,21 +89,23 @@ async def strava_webhook(request: Request):
         dati_strava = strava.format_strava_data_for_gemini(activity_id)
         
         if dati_strava:
+            # Invia a tutti gli utenti attivi
+            utenti = db._load_db()
+            for chat_id, data in utenti.items():
             # Analizza con Gemini
-            uscita = db.get_activity("", dati_strava["strava_id"])
-            if not uscita:
-                analisi_testo = coach.analizza_uscita(dati_strava)
-                db.save_activity(chat_id,activity_id,'',analisi_testo)
-                # Invia a tutti gli utenti attivi
-                utenti = db._load_db()
-                for chat_id, data in utenti.items():
-                    if data.get("stato") == "ACTIVE":
-                        messaggio_finale = f"🚴‍♂️ **Nuova attività rilevata!**\n\n{analisi_testo}"
-                        try:
-                            await bot_app.bot.send_message(chat_id=chat_id, text=messaggio_finale, parse_mode='Markdown')
-                        except telegram.error.BadRequest as e:
-                            print(f"⚠️ Errore Markdown intercettato: invio come testo semplice. Dettaglio: {e}")
-                            await bot_app.bot.send_message(chat_id=chat_id, text=messaggio_finale)
+                uscita = db.get_activity(chat_id, dati_strava["strava_id"])
+                if not uscita and data.get("stato") == "ACTIVE":
+                    analisi_testo = coach.analizza_uscita(dati_strava)
+                    db.save_activity(chat_id,activity_id,'',analisi_testo)
+                    messaggio_finale = f"🚴‍♂️ **Nuova attività rilevata!**\n\n{analisi_testo}"
+                    
+                else:
+                    continue
+                try:
+                    await bot_app.bot.send_message(chat_id=chat_id, text=messaggio_finale, parse_mode='Markdown')
+                except telegram.error.BadRequest as e:
+                    print(f"⚠️ Errore Markdown intercettato: invio come testo semplice. Dettaglio: {e}")
+                    await bot_app.bot.send_message(chat_id=chat_id, text=messaggio_finale)
                     
     return {"status": "ok"}
 
@@ -135,7 +137,7 @@ async def routine_settimanale_piani():
                     
                         
                     piano_generato = f"""
-                    {dati_utente.get("piano_corrente")}
+                    {dati_utente["profilo"]["piano_corrente"]}
                     \n\n\n Questo il feedback della {week -1} e il programma aggiornato della {week}\n\n\n
                     {messaggio}
                     """

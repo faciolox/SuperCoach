@@ -55,7 +55,7 @@ def update_user_profile(chat_id, key, value):
 # --- FUNZIONI GESTIONE ATTIVITA' ---
 def get_activity(chat_id, id):
     activity = activities.find_one({"activity_id": str(id)})
-    if activity and activity.get("chat_id") != chat_id:
+    if activity and activity.get("chat_id") != str(chat_id):
         return {}
     return activity if activity else {}
 

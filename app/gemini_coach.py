@@ -112,7 +112,7 @@ def analizza_uscite_settimanali(dati_strava_puliti:dict):
             output += uscita.get("messaggio")
         else: 
             prompt += f"""\n
-                Uscita {uscite.get('titolo')} in data {uscite.get('data')}.
+                Uscita {uscite.get('titolo')} in data {uscite.get('Start time')}.
                 
                 - Titolo attività: {uscite.get('titolo')}
                 - Distanza: {uscite.get('distanza_km')} km
@@ -219,7 +219,7 @@ def aggiorna_piano(utente_aggiornato):
     uscite_formattate = ""
     for uscite in uscite_settimanali:
         uscite_formattate += f"""\n
-            Uscita {uscite.get('titolo')} in data {uscite.get('data')}.
+            Uscita {uscite.get('titolo')} in data {uscite.get('Start time')}.
             
             - Titolo attività: {uscite.get('titolo')}
             - Distanza: {uscite.get('distanza_km')} km
