@@ -178,7 +178,7 @@ async def ultima_uscita(update: Update, context: ContextTypes.DEFAULT_TYPE):
             analisi = analizza_uscita(
                 dati_strava,
                 profilo=utente.get("profilo", {}),
-                allenamento_previsto=db.get_workout_by_date(chat_id, dati_strava["data"]),
+                allenamento_previsto=db.get_workout_by_date(chat_id, dati_strava["Start time"]),
             )
             db.save_activity(chat_id,activity_id,'',analisi)
             await update.message.reply_text(f"🚴‍♂️ **Report Ultima Uscita:**\n\n{analisi}")
