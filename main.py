@@ -14,6 +14,7 @@ import app.database as db
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 import asyncio
+import time as sl
 from datetime import datetime, date, timedelta
 load_dotenv()
 
@@ -83,6 +84,7 @@ async def verify_strava(request: Request):
 async def strava_webhook(request: Request):
     """Ricezione delle notifiche di nuove attività da Strava."""
     payload = await request.json()
+    sl.sleep(300)
     print(f"🔔 Ricevuto evento da Strava: {payload}")
     
     if payload.get("aspect_type") == "create" and payload.get("object_type") == "activity":
@@ -101,7 +103,7 @@ async def strava_webhook(request: Request):
                     analisi_testo = coach.analizza_uscita(
                         dati_strava,
                         profilo=data.get("profilo", {}),
-                        allenamento_previsto=db.get_workout_by_date(chat_id, dati_strava["data"]),
+                        allenamento_previsto=db.get_workout_by_date(chat_id, dati_strava["Start time"]),
                     )
                     db.save_activity(chat_id,activity_id,'',analisi_testo)
                     messaggio_finale = f"🚴‍♂️ **Nuova attività rilevata!**\n\n{analisi_testo}"
