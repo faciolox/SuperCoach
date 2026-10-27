@@ -84,7 +84,7 @@ async def verify_strava(request: Request):
 async def strava_webhook(request: Request):
     """Ricezione delle notifiche di nuove attività da Strava."""
     payload = await request.json()
-    sl.sleep(300)
+    sl.sleep(60)
     print(f"🔔 Ricevuto evento da Strava: {payload}")
     
     if payload.get("aspect_type") == "create" and payload.get("object_type") == "activity":
